@@ -21,5 +21,18 @@ function validate(level: LevelData, path: string): LevelData {
     if (!Array.isArray(o.patrol) || o.patrol.length < 1) fail(`officer ${i} needs at least one patrol point`);
     if (o.mode !== 'loop' && o.mode !== 'pingpong') fail(`officer ${i} "mode" must be "loop" or "pingpong"`);
   });
+  level.crowds ??= [];
+  if (!Array.isArray(level.crowds)) fail('"crowds" must be an array');
+  level.crowds.forEach((c, i) => {
+    if (!(c.size >= 1)) fail(`crowd ${i} needs a "size" of at least 1`);
+    if (c.type === 'marching') {
+      if (!Array.isArray(c.path) || c.path.length < 2) fail(`crowd ${i} needs at least two path points`);
+      if (!(c.intervalMs >= 0)) fail(`crowd ${i} needs "intervalMs"`);
+    } else if (c.type === 'standing') {
+      if (typeof c.x !== 'number' || typeof c.y !== 'number') fail(`crowd ${i} needs "x" and "y"`);
+    } else {
+      fail(`crowd ${i} "type" must be "marching" or "standing"`);
+    }
+  });
   return level;
 }

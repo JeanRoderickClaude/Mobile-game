@@ -27,8 +27,9 @@ Live build: https://jeanroderickclaude.github.io/Mobile-game/ (redeployed on eve
 - `src/config.ts`: tuning constants (speeds, catch time, character scale, colours).
 - `src/scenes/GameScene.ts`: loads a level, draws street and obstacles, player input and collision, detection, HUD timer.
 - `src/scenes/ResultScene.ts`: "Caught" / "Route complete" overlay with Restart (and "Next level" when one exists). Enter, Space or R also restart.
-- `src/entities/Player.ts`: the protestor, built from stacked layers.
-- `src/entities/cosmetics.ts`: tables of bodies (skin tones), outfits and hats.
+- `src/entities/Character.ts`: a protestor (player or crowd member), built from stacked layers. Crowd members are baked into one cached image.
+- `src/entities/Crowd.ts`: marching and standing groups of protestors the player can hide in.
+- `src/entities/cosmetics.ts`: tables of bodies (skin tones), outfits and hats, plus the pools crowd members pick from.
 - `src/entities/PoliceOfficer.ts`: patrol movement, facing, vision test, cone drawing.
 - `src/systems/VirtualJoystick.ts`: floating touch joystick.
 - `src/systems/geometry.ts`: ray-vs-rectangle, line of sight, angle helpers.
@@ -38,12 +39,16 @@ Live build: https://jeanroderickclaude.github.io/Mobile-game/ (redeployed on eve
 
 - Portrait, fixed 540x960 design resolution. The canvas scales to fit the screen with letterboxing. All level coordinates use these units.
 - A level is as wide as the screen (540) and several screens tall (level 1: 2880, three screens). The camera follows the player vertically within the level bounds.
-- Controls: arrow keys or WASD on desktop. On touch screens a joystick appears where the finger lands and follows the drag. Mouse dragging works too. Keyboard input wins when both are used.
+- Controls: arrow keys or WASD on desktop; hold Shift to walk at crowd pace (60 percent). On touch screens a joystick appears where the finger lands and follows the drag. Mouse dragging works too. Keyboard input wins when both are used.
 - Buildings and parked cars are axis-aligned rectangles. They block movement and line of sight. The player collides as a square of half-size `PLAYER_RADIUS` (13 times `CHARACTER_SCALE`, so 16.25), resolved one axis at a time so it slides along walls.
-- Detection: an officer sees the player when the player's centre is within `visionRange`, within half of `visionAngle` of the officer's facing, and the segment between them crosses no obstacle. A suspicion meter fills while any officer sees the player and drains at twice that speed otherwise. At `CATCH_TIME_MS` (500 ms) the player is caught. A red bar above the player shows the meter.
+- Detection: an officer sees the player when the player's centre is within `visionRange`, within half of `visionAngle` of the officer's facing, and the segment between them crosses no obstacle. A suspicion meter fills while any officer sees the player and drains at twice that speed otherwise. While the player is hidden in a crowd it fills at `HIDDEN_DETECTION_RATE` (25 percent). At `CATCH_TIME_MS` (500 ms) the player is caught. A red bar above the player shows the meter.
 - Vision cones are drawn by casting `VISION_RAYS` rays per officer each frame, so the drawn cone is cut off by obstacles. What the player sees matches what the officer can see.
 - Officers walk their waypoints at `speed`, wait `pauseMs` at each one, and turn smoothly toward the next leg (also while waiting). `loop` routes return to the first point; `pingpong` routes walk back.
 - Levels are data. Every `src/levels/*.json` file is picked up by `import.meta.glob` and played in file-name order. Adding a level needs no code change; a "Next level" button appears after finishing when a next file exists. Bad data fails at startup with an error naming the file.
+- Crowds: defined per level. Marching groups walk their `path` at `speed` (default 60 percent of `PLAYER_SPEED`, 102) in a loose two-wide column that turns with the path, fade out at the end, and a new group starts at the first point `intervalMs` later. Standing groups shuffle in place at `x, y`. Protestors block nothing: not movement, not line of sight. A faint disc shows each group's `radius` (default `CROWD_RADIUS`, 75).
+- Hiding: the player is hidden while within a group's radius and moving no faster than `HIDE_SPEED_MARGIN` (1.1) times the group's speed, with a floor of `HIDE_SPEED_FLOOR` (25 units/s) so standing groups (speed 0) allow a slow shuffle. Player speed is measured after collision, so pushing into a wall counts as standing. A three-heads icon shows above the player while hidden.
+- The player wears a magenta vest (`vest-magenta`, kept out of the crowd pools) and a white marker ring, so they stay visible in a crowd.
+- Crowd members are baked: `Character` with `{ baked: true }` renders its layers once into a texture per look (2x resolution) and shows one image. This saves about 20 percent of frame time with 32 protestors. Baked members do not swing their hands.
 - Character size: the player and officer containers are drawn at `CHARACTER_SCALE` (1.25). The art stays authored at base size. Collision and the suspicion bar offset scale with it. Vision cones start at the officer's centre, which scaling does not move. Level gaps the player must pass need to be at least 33 units wide (level 1's narrowest is 50).
 - Cosmetics: the player is a `Container` with separate Graphics layers: body (hands), outfit, head (uses the body's skin tone so it sits above the outfit), hat. `setBodyStyle`, `setOutfit` and `setHat` redraw one layer. New items are new entries in `cosmetics.ts`. Items draw in local space, facing up, head at (0, 0).
 - Frame time is capped at 50 ms per update, so a background tab does not teleport the player or officers.
@@ -62,6 +67,20 @@ Live build: https://jeanroderickclaude.github.io/Mobile-game/ (redeployed on eve
 ```
 
 `color` is optional. Keep the start point outside every cone's reach. Leave at least 33 units for any gap the player must walk through.
+
+Crowds are optional:
+
+```json
+"crowds": [
+  { "type": "marching", "size": 8, "intervalMs": 6000, "delayMs": 0,
+    "path": [{ "x": 205, "y": 2830 }, { "x": 205, "y": 20 }] },
+  { "type": "standing", "size": 8, "x": 300, "y": 2220 }
+]
+```
+
+`radius` (both types) and `speed` (marching) are optional. Members can overlap obstacles visually, so keep paths in open road where possible.
+
+Level 1 balance (measured with simulation scripts, not in the repo): riding either marching group to the finish survived 24 of 24 runs across 12 cycles, with peak suspicion 124-464 ms of the 500 ms limit. Standing still alone at either standing group's spot gets caught (7.2 s and 0.5 s); standing in the group survives 90 s. Walking the marching routes alone at full speed survived 5 of 23 start times. A search with perfect timing still finds a solo route in about 27 s. Officers that walk the same direction as a crowd, just behind it, are what kill crowd runs: prefer crosswise sweeps with narrow cones (50 degrees) near crowd paths.
 
 ## Testing
 

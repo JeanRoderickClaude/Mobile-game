@@ -15,6 +15,19 @@ export const CATCH_TIME_MS = 500;
 // When out of sight, the suspicion meter drains at this multiple of the fill rate.
 export const SUSPICION_DECAY = 2;
 
+// Holding Shift on a keyboard walks at this fraction of top speed (crowd pace).
+export const WALK_FACTOR = 0.6;
+
+// Crowds of fellow protestors.
+export const CROWD_SPEED_FACTOR = 0.6; // marching pace as a fraction of PLAYER_SPEED
+export const CROWD_RADIUS = 75; // default "inside the group" distance from its centre
+// Hidden in a crowd: detection fills at this fraction of the normal rate.
+export const HIDDEN_DETECTION_RATE = 0.25;
+// Hidden only while moving no faster than the group's speed times this margin...
+export const HIDE_SPEED_MARGIN = 1.1;
+// ...or no faster than this, so standing groups (speed 0) allow a slow shuffle.
+export const HIDE_SPEED_FLOOR = 25;
+
 export const OFFICER_TURN_SPEED = 4; // radians per second
 export const VISION_RAYS = 48; // rays used to draw each vision cone
 

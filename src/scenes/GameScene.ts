@@ -1,6 +1,11 @@
 import Phaser from 'phaser';
-import { CATCH_TIME_MS, CHARACTER_SCALE, COLORS, GAME_WIDTH, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY } from '../config';
-import { Player } from '../entities/Player';
+import {
+  CATCH_TIME_MS, CHARACTER_SCALE, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
+  PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR,
+} from '../config';
+import { Character } from '../entities/Character';
+import { DEFAULT_LOOK } from '../entities/cosmetics';
+import { Crowd } from '../entities/Crowd';
 import { PoliceOfficer } from '../entities/PoliceOfficer';
 import { LEVELS } from '../levels';
 import type { LevelData, Obstacle, Rect } from '../levels/types';
@@ -15,16 +20,20 @@ export interface GameSceneData {
 export class GameScene extends Phaser.Scene {
   private level!: LevelData;
   private levelIndex = 0;
-  private player!: Player;
+  private player!: Character;
   private officers: PoliceOfficer[] = [];
+  private crowds: Crowd[] = [];
   private blockers: Rect[] = [];
   private joystick!: VirtualJoystick;
-  private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd', Phaser.Input.Keyboard.Key>;
+  private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift', Phaser.Input.Keyboard.Key>;
   private suspicion = 0; // ms of accumulated sight, caught at CATCH_TIME_MS
   private elapsedMs = 0;
   private finished = false;
   private timerText!: Phaser.GameObjects.Text;
   private meter!: Phaser.GameObjects.Graphics;
+  private hiddenIcon!: Phaser.GameObjects.Container;
+  private playerSpeed = 0; // actual units per second over the last frame
+  private hidden = false;
 
   constructor() {
     super('game');
@@ -34,6 +43,9 @@ export class GameScene extends Phaser.Scene {
     this.levelIndex = data.levelIndex ?? 0;
     this.level = LEVELS[this.levelIndex];
     this.officers = [];
+    this.crowds = [];
+    this.playerSpeed = 0;
+    this.hidden = false;
     this.blockers = this.level.obstacles;
     this.suspicion = 0;
     this.elapsedMs = 0;
@@ -52,15 +64,18 @@ export class GameScene extends Phaser.Scene {
 
     this.officers = this.level.officers.map((d) => new PoliceOfficer(this, d));
 
-    this.player = new Player(this, this.level.start.x, this.level.start.y).setDepth(30);
+    this.crowds = (this.level.crowds ?? []).map((d) => new Crowd(this, d));
+
+    this.player = new Character(this, this.level.start.x, this.level.start.y, DEFAULT_LOOK, { marker: true }).setDepth(30);
     this.cameras.main.startFollow(this.player, true, 1, 0.15);
 
     this.meter = this.add.graphics().setDepth(40);
+    this.hiddenIcon = this.buildHiddenIcon();
 
     const kb = this.input.keyboard!;
     const K = Phaser.Input.Keyboard.KeyCodes;
     this.keys = kb.addKeys({
-      up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D,
+      up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D, shift: K.SHIFT,
     }) as typeof this.keys;
     this.joystick = new VirtualJoystick(this);
 
@@ -83,6 +98,7 @@ export class GameScene extends Phaser.Scene {
 
     this.movePlayer(dt);
     for (const o of this.officers) o.update(dt);
+    for (const c of this.crowds) c.update(dt);
     this.updateDetection(dt);
 
     this.timerText.setText(formatTime(this.elapsedMs));
@@ -99,7 +115,8 @@ export class GameScene extends Phaser.Scene {
     if (k.up.isDown || k.w.isDown) dy -= 1;
     if (k.down.isDown || k.s.isDown) dy += 1;
     if (dx !== 0 || dy !== 0) {
-      const len = Math.hypot(dx, dy);
+      // Shift walks at crowd pace, since keys have no half-press like the joystick.
+      const len = Math.hypot(dx, dy) / (k.shift.isDown ? WALK_FACTOR : 1);
       dx /= len;
       dy /= len;
     } else {
@@ -108,9 +125,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     const step = (PLAYER_SPEED * dt) / 1000;
+    const fromX = this.player.x;
+    const fromY = this.player.y;
     // Move each axis separately so the player slides along walls.
     this.player.x = this.resolveAxis(this.player.x + dx * step, this.player.y, 'x');
     this.player.y = this.resolveAxis(this.player.x, this.player.y + dy * step, 'y');
+    // Measured after collision, so pushing into a wall counts as standing still.
+    this.playerSpeed = dt > 0 ? (Math.hypot(this.player.x - fromX, this.player.y - fromY) * 1000) / dt : 0;
     this.player.updateMotion(dx, dy, dt);
   }
 
@@ -132,9 +153,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateDetection(dt: number): void {
-    const seen = this.officers.some((o) => o.canSee(this.player.x, this.player.y, this.blockers));
+    const { x, y } = this.player;
+    // Hidden while inside a group and not outpacing it by more than the margin.
+    this.hidden = this.crowds.some(
+      (c) => c.contains(x, y) && this.playerSpeed <= Math.max(c.speed * HIDE_SPEED_MARGIN, HIDE_SPEED_FLOOR),
+    );
+    const seen = this.officers.some((o) => o.canSee(x, y, this.blockers));
     this.suspicion = seen
-      ? this.suspicion + dt
+      ? this.suspicion + dt * (this.hidden ? HIDDEN_DETECTION_RATE : 1)
       : Math.max(0, this.suspicion - dt * SUSPICION_DECAY);
     const alert = Math.min(1, this.suspicion / CATCH_TIME_MS);
 
@@ -151,7 +177,20 @@ export class GameScene extends Phaser.Scene {
       this.meter.fillStyle(COLORS.coneAlert, 1).fillRect(x, y, 40 * alert, 6);
     }
 
+    this.hiddenIcon.setVisible(this.hidden).setPosition(x, y - 58 * CHARACTER_SCALE);
+
     if (this.suspicion >= CATCH_TIME_MS) this.end('caught');
+  }
+
+  /** Small bubble with three heads, shown above the player while hidden in a crowd. */
+  private buildHiddenIcon(): Phaser.GameObjects.Container {
+    const g = this.add.graphics();
+    g.fillStyle(0x1d1f2b, 0.85).fillRoundedRect(-17, -11, 34, 22, 8);
+    g.lineStyle(2, 0x7be08f, 1).strokeRoundedRect(-17, -11, 34, 22, 8);
+    g.fillStyle(0x7be08f, 1);
+    g.fillCircle(-9, 1, 4).fillCircle(9, 1, 4);
+    g.fillStyle(0xffffff, 1).fillCircle(0, -1, 5);
+    return this.add.container(0, 0, [g]).setDepth(41).setVisible(false);
   }
 
   private end(outcome: ResultData['outcome']): void {
