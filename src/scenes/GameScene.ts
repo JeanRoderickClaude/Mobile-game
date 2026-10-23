@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CATCH_TIME_MS, COLORS, GAME_WIDTH, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY } from '../config';
+import { CATCH_TIME_MS, CHARACTER_SCALE, COLORS, GAME_WIDTH, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY } from '../config';
 import { Player } from '../entities/Player';
 import { PoliceOfficer } from '../entities/PoliceOfficer';
 import { LEVELS } from '../levels';
@@ -146,7 +146,7 @@ export class GameScene extends Phaser.Scene {
     this.meter.clear();
     if (alert > 0) {
       const x = this.player.x - 20;
-      const y = this.player.y - 32;
+      const y = this.player.y - 32 * CHARACTER_SCALE;
       this.meter.fillStyle(0x000000, 0.6).fillRect(x - 2, y - 2, 44, 10);
       this.meter.fillStyle(COLORS.coneAlert, 1).fillRect(x, y, 40 * alert, 6);
     }

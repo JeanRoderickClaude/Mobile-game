@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, OFFICER_TURN_SPEED, VISION_RAYS } from '../config';
+import { CHARACTER_SCALE, COLORS, OFFICER_TURN_SPEED, VISION_RAYS } from '../config';
 import type { OfficerData, Rect } from '../levels/types';
 import { angleDiff, castRay, hasLineOfSight } from '../systems/geometry';
 
@@ -131,7 +131,7 @@ export class PoliceOfficer {
     g.fillEllipse(0, -8, 13, 6); // cap peak
     g.fillStyle(0xffffff, 1);
     g.fillRect(-2, -3, 4, 3);
-    return scene.add.container(this.x, this.y, [g]);
+    return scene.add.container(this.x, this.y, [g]).setScale(CHARACTER_SCALE);
   }
 
   private syncSprite(): void {

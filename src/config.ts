@@ -3,8 +3,12 @@
 export const GAME_WIDTH = 540;
 export const GAME_HEIGHT = 960;
 
+// Characters (player and officers) are drawn at this multiple of their base
+// art size. Collision and the suspicion meter offset scale with it.
+export const CHARACTER_SCALE = 1.25;
+
 export const PLAYER_SPEED = 170; // units per second
-export const PLAYER_RADIUS = 13; // collision half-size of the player box
+export const PLAYER_RADIUS = 13 * CHARACTER_SCALE; // collision half-size of the player box
 
 // How long the player must stay in sight before being caught.
 export const CATCH_TIME_MS = 500;

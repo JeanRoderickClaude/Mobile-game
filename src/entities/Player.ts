@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { CHARACTER_SCALE } from '../config';
 import { BODIES, DEFAULT_LOOK, HATS, OUTFITS, type PlayerLook } from './cosmetics';
 
 /**
@@ -29,6 +30,7 @@ export class Player extends Phaser.GameObjects.Container {
     this.redrawBody();
     this.redrawOutfit();
     this.redrawHat();
+    this.setScale(CHARACTER_SCALE);
     scene.add.existing(this);
   }
 
