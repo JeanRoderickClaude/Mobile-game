@@ -34,6 +34,7 @@ Live build: https://jeanroderickclaude.github.io/Mobile-game/ (redeployed on eve
 - `src/systems/VirtualJoystick.ts`: floating touch joystick.
 - `src/systems/geometry.ts`: ray-vs-rectangle, line of sight, angle helpers.
 - `src/levels/*.json`: level data. `src/levels/types.ts` describes the format; `src/levels/index.ts` loads and checks it.
+- `tools/`: balance tools. Node scripts that start Vite, load a level in headless Chromium and measure difficulty: crowd rides, blind solo runs, standing groups, good standing spots, a perfect-knowledge route search and a cone coverage map. `tools/README.md` explains each and how to read the output. Run them after any level change.
 
 ## Design decisions
 
@@ -80,12 +81,13 @@ Crowds are optional:
 
 `radius` (both types) and `speed` (marching) are optional. Members can overlap obstacles visually, so keep paths in open road where possible.
 
-Level 1 balance (measured with simulation scripts, not in the repo): riding either marching group to the finish survived 24 of 24 runs across 12 cycles, with peak suspicion 124-464 ms of the 500 ms limit. Standing still alone at either standing group's spot gets caught (7.2 s and 0.5 s); standing in the group survives 90 s. Walking the marching routes alone at full speed survived 5 of 23 start times. A search with perfect timing still finds a solo route in about 27 s. Officers that walk the same direction as a crowd, just behind it, are what kill crowd runs: prefer crosswise sweeps with narrow cones (50 degrees) near crowd paths.
+Level 1 balance (measured with the scripts in `tools/`): riding either marching group to the finish survived 24 of 24 runs across 12 cycles, with peak suspicion 124-464 ms of the 500 ms limit. Standing still alone at either standing group's spot gets caught (7.2 s and 0.5 s); standing in the group survives 90 s. Walking the marching routes alone at full speed survived 5 of 23 start times. A search with perfect timing still finds a solo route in about 27 s. Officers that walk the same direction as a crowd, just behind it, are what kill crowd runs: prefer crosswise sweeps with narrow cones (50 degrees) near crowd paths.
 
 ## Testing
 
 - Manual: walk into a cone (caught after about half a second), stand behind a building inside a cone's range (not caught), reach the finish (time shown).
-- Automated checks so far are ad hoc Playwright scripts against the dev server (`http://localhost:5173/Mobile-game/`), using `window.game.scene.getScene('game')` to place the player and freeze an officer. There is no test runner in the project yet.
+- Balance: `node tools/ride.mjs src/levels/level-01.json` and the other scripts in `tools/` (see `tools/README.md`). Playwright 1.63.0 is a devDependency; on a new machine run `npx playwright install chromium` once.
+- Other automated checks are ad hoc Playwright scripts against the dev server (`http://localhost:5173/Mobile-game/`), using `window.game.scene.getScene('game')` to place the player and freeze an officer. There is no test runner in the project yet.
 
 ## Not built yet
 
