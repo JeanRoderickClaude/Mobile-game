@@ -28,6 +28,17 @@ export const HIDE_SPEED_MARGIN = 1.1;
 // ...or no faster than this, so standing groups (speed 0) allow a slow shuffle.
 export const HIDE_SPEED_FLOOR = 25;
 
+// Coins and the finish bonus.
+export const COIN_VALUE = 5; // value of a coin whose level entry has no "value"
+export const COIN_PICKUP_RADIUS = PLAYER_RADIUS + 10; // player centre to coin centre
+// Finishing pays FINISH_BONUS_MAX at or under the level's par time, falling in a
+// straight line to FINISH_BONUS_MIN at FINISH_SLOW_FACTOR times par and slower.
+export const FINISH_BONUS_MAX = 40;
+export const FINISH_BONUS_MIN = 10;
+export const FINISH_SLOW_FACTOR = 3;
+// Default par: walking the level's height at full speed, times this factor.
+export const PAR_TIME_FACTOR = 1.2;
+
 export const OFFICER_TURN_SPEED = 4; // radians per second
 export const VISION_RAYS = 48; // rays used to draw each vision cone
 
@@ -45,4 +56,8 @@ export const COLORS = {
   cone: 0xfff3a0,
   coneAlert: 0xff4a4a,
   text: '#ffffff',
+  coin: 0xf2c94c,
+  coinRim: 0xb8901f,
+  coinValuable: 0x5ce1e6,
+  coinValuableRim: 0x1b8a9a,
 };

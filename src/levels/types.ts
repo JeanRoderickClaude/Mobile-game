@@ -57,6 +57,12 @@ export interface StandingCrowdData extends CrowdBase {
 
 export type CrowdData = MarchingCrowdData | StandingCrowdData;
 
+/** A coin lying on the street. Collected by walking over it. */
+export interface CoinData extends Point {
+  /** Coins added to the run when picked up. Default COIN_VALUE (5). Higher values draw as valuable coins. */
+  value?: number;
+}
+
 export interface LevelData {
   id: string;
   name: string;
@@ -68,4 +74,8 @@ export interface LevelData {
   officers: OfficerData[];
   /** Optional. Fellow protestors the player can hide among. */
   crowds?: CrowdData[];
+  /** Optional. Coins to pick up during a run. */
+  coins?: CoinData[];
+  /** Optional. Finish time in seconds that earns the full speed bonus. Default: height / PLAYER_SPEED x PAR_TIME_FACTOR. */
+  parTimeSec?: number;
 }

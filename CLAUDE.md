@@ -23,18 +23,26 @@ Live build: https://jeanroderickclaude.github.io/Mobile-game/ (redeployed on eve
 - `vite.config.ts`: base path `/Mobile-game/`, must match the repository name.
 - `.github/workflows/deploy.yml`: on every push to `main`, runs `npm ci` and `npm run build` on Node 22 and publishes `dist/` to GitHub Pages.
 - `index.html`: page shell, full-screen `#game` div, touch scrolling off.
-- `src/main.ts`: Phaser game config (540x960 design size, `Scale.FIT`, centred, 2 touch pointers). Exposes `window.game` in dev only.
+- `src/main.ts`: Phaser game config (540x960 design size, `Scale.FIT`, centred, 2 touch pointers). Starts on the menu. Exposes `window.game` in dev only.
 - `src/config.ts`: tuning constants (speeds, catch time, character scale, colours).
-- `src/scenes/GameScene.ts`: loads a level, draws street and obstacles, player input and collision, detection, HUD timer.
-- `src/scenes/ResultScene.ts`: "Caught" / "Route complete" overlay with Restart (and "Next level" when one exists). Enter, Space or R also restart.
+- `src/scenes/MenuScene.ts`: first screen. Title, the equipped look, coin balance, Play (level 1) and Locker buttons. Enter or Space plays, L opens the locker.
+- `src/scenes/LockerScene.ts`: the shop. Large character preview, Hats / Outfits / Signs tabs, item grid, Buy / Equip button. Escape or Back returns to the menu.
+- `src/scenes/GameScene.ts`: loads a level, draws street and obstacles, player input and collision, detection, coins, HUD timer and coin counter, payout at the end.
+- `src/scenes/ResultScene.ts`: "Caught" / "Route complete" overlay with the coin breakdown, Restart, "Next level" when one exists, and Menu. Enter, Space or R restart; Escape goes to the menu.
 - `src/entities/Character.ts`: a protestor (player or crowd member), built from stacked layers. Crowd members are baked into one cached image.
 - `src/entities/Crowd.ts`: marching and standing groups of protestors the player can hide in.
-- `src/entities/cosmetics.ts`: tables of bodies (skin tones), outfits and hats, plus the pools crowd members pick from.
+- `src/entities/cosmetics.ts`: tables of bodies (skin tones), outfits, hats and signs, the pools crowd members pick from, and the shape recipes that draw shop items.
+- `src/entities/Coin.ts`: a coin on the street, its idle bob and pickup animation.
+- `src/data/items.json`: the 12 shop items. `src/data/items.ts` describes and checks them.
+- `src/systems/save.ts`: coin balance, owned and equipped items, mirrored to localStorage.
+- `src/systems/economy.ts`: par time and finish bonus.
+- `src/systems/sfx.ts`: coin pickup sound, synthesised with Web Audio.
+- `src/ui/widgets.ts`: shared button, coin drawing and coin-count label.
 - `src/entities/PoliceOfficer.ts`: patrol movement, facing, vision test, cone drawing.
 - `src/systems/VirtualJoystick.ts`: floating touch joystick.
 - `src/systems/geometry.ts`: ray-vs-rectangle, line of sight, angle helpers.
 - `src/levels/*.json`: level data. `src/levels/types.ts` describes the format; `src/levels/index.ts` loads and checks it.
-- `tools/`: balance tools. Node scripts that start Vite, load a level in headless Chromium and measure difficulty: crowd rides, blind solo runs, standing groups, good standing spots, a perfect-knowledge route search and a cone coverage map. `tools/README.md` explains each and how to read the output. Run them after any level change.
+- `tools/`: balance tools. Node scripts that start Vite, load a level in headless Chromium and measure difficulty: crowd rides (with coins earned), blind solo runs, standing groups, good standing spots, a perfect-knowledge route search, a cone coverage map and coin risk. `tools/README.md` explains each and how to read the output. Run them after any level change.
 
 ## Design decisions
 
@@ -51,8 +59,34 @@ Live build: https://jeanroderickclaude.github.io/Mobile-game/ (redeployed on eve
 - The player wears a magenta vest (`vest-magenta`, kept out of the crowd pools) and a white marker ring, so they stay visible in a crowd.
 - Crowd members are baked: `Character` with `{ baked: true }` renders its layers once into a texture per look (2x resolution) and shows one image. This saves about 20 percent of frame time with 32 protestors. Baked members do not swing their hands.
 - Character size: the player and officer containers are drawn at `CHARACTER_SCALE` (1.25). The art stays authored at base size. Collision and the suspicion bar offset scale with it. Vision cones start at the officer's centre, which scaling does not move. Level gaps the player must pass need to be at least 33 units wide (level 1's narrowest is 50).
-- Cosmetics: the player is a `Container` with separate Graphics layers: body (hands), outfit, head (uses the body's skin tone so it sits above the outfit), hat. `setBodyStyle`, `setOutfit` and `setHat` redraw one layer. New items are new entries in `cosmetics.ts`. Items draw in local space, facing up, head at (0, 0).
+- Cosmetics: the player is a `Container` with separate Graphics layers, bottom to top: body (hands), outfit, sign, head (uses the body's skin tone so it sits above the outfit), hat. `setBodyStyle`, `setOutfit`, `setSign` and `setHat` redraw one layer; `setLook` sets all. Items draw in local space, facing up, head at (0, 0). Signs are held ahead of the player and reach up to y -32, so baked textures cover -32..32. Crowd members never carry signs and never wear shop items, so the player stays unique.
 - Frame time is capped at 50 ms per update, so a background tab does not teleport the player or officers.
+
+## Economy
+
+- Coins lie on the street, placed per level. Walking within `COIN_PICKUP_RADIUS` (26.25) of a coin's centre picks it up. A coin is worth its `value`, default `COIN_VALUE` (5). Coins worth more than 5 draw larger, in cyan with a star.
+- Coins picked up in a run are held until the run ends. Finishing pays them out plus a speed bonus. Getting caught loses all of them; the Caught screen says how many.
+- Speed bonus: `FINISH_BONUS_MAX` (40) at or under the level's par time, falling in a straight line to `FINISH_BONUS_MIN` (10) at `FINISH_SLOW_FACTOR` (3) times par and slower. Par is the level's `parTimeSec`, or by default its height walked at full speed times `PAR_TIME_FACTOR` (1.2): 20.3 s for level 1.
+- Level 1 has 15 coins worth 135: 10 commons on the two crowd routes (5 per route), one at each standing group, and 3 valuable coins (25) in the side alleys at y 1350 and 1920 where officers sweep. Measured with `tools/ride.mjs` and `tools/coins.mjs`: riding a crowd collects its 5 route coins and never gets caught (24 of 24); a good run (joining the first group) earns 60 via crowd 0 (27.3 s, bonus 35) or 51 via crowd 1 (38.8 s, bonus 26). A blind solo dash from the nearest route to a valuable coin and back is caught on 28, 18 and 18 of 40 start times. Every valuable coin is at least 138 units from a crowd route, beyond the 75-unit crowd radius.
+- Prices: cheapest about two good runs (120), most expensive about ten (600).
+- Save data lives in localStorage under `protest-route.save.v1`: `{ "coins": 120, "owned": ["hat-bandana"], "equipped": { "hat": "hat-bandana", "outfit": "vest-magenta", "sign": "none" } }`. Every read and write is wrapped in try/catch; if storage is blocked the game runs with progress kept in memory for the session. Loading drops unknown items, unowned equipped items and bad numbers. Bump the key's version when the shape changes incompatibly.
+- Default items (beanie, magenta vest, no sign) are always owned, never listed in `owned`, and shown first in each locker tab.
+
+## Shop item format
+
+`src/data/items.json` is an array. Each entry:
+
+```json
+{ "id": "hat-bandana", "name": "Bandana", "category": "hat", "price": 120, "shape": "bandana", "color": "#c0392b", "accent": "#f4f4f4" }
+```
+
+- `id`: unique, stored in saves. Renaming one drops it from existing saves.
+- `category`: `hat`, `outfit` or `sign` (the locker tabs).
+- `price`: whole coins, above 0.
+- `shape`: drawing recipe for that category. Hats: `bandana`, `beret`, `hardhat`, `crown`. Outfits: `tracksuit`, `jersey`, `poncho`, `cape`. Signs: `placard`, `lollipop`, `flag`, `banner`. Recipes live in `cosmetics.ts` (`HAT_SHAPES`, `OUTFIT_SHAPES`, `SIGN_SHAPES`) and take the two colours.
+- `color`, `accent`: `#rrggbb`.
+
+Adding an item with an existing shape is a JSON-only change. A new shape needs a recipe in `cosmetics.ts` and its name in `SHAPES` in `items.ts`. Bad entries fail at startup with an error naming the entry. The locker shows up to five tiles per tab (the default plus four items); more items per category need a scrolling grid.
 
 ## Level format (short)
 
@@ -81,14 +115,24 @@ Crowds are optional:
 
 `radius` (both types) and `speed` (marching) are optional. Members can overlap obstacles visually, so keep paths in open road where possible.
 
+Coins and par time are optional:
+
+```json
+"parTimeSec": 20,
+"coins": [{ "x": 205, "y": 2450 }, { "x": 60, "y": 1350, "value": 25 }]
+```
+
+Put common coins on crowd paths (within 26 units, so riding collects them). Put valuable coins more than 75 units from every crowd path and check them with `tools/coins.mjs`.
+
 Level 1 balance (measured with the scripts in `tools/`): riding either marching group to the finish survived 24 of 24 runs across 12 cycles, with peak suspicion 124-464 ms of the 500 ms limit. Standing still alone at either standing group's spot gets caught (7.2 s and 0.5 s); standing in the group survives 90 s. Walking the marching routes alone at full speed survived 5 of 23 start times. A search with perfect timing still finds a solo route in about 27 s. Officers that walk the same direction as a crowd, just behind it, are what kill crowd runs: prefer crosswise sweeps with narrow cones (50 degrees) near crowd paths.
 
 ## Testing
 
 - Manual: walk into a cone (caught after about half a second), stand behind a building inside a cone's range (not caught), reach the finish (time shown).
+- Economy: with cleared storage, collect coins and get caught (Caught screen states the loss, menu balance stays 0); finish a run (balance equals coins plus the stated bonus); buy and equip an item in the locker, start a run (the player wears it); reload (balance, owned and equipped survive).
 - Balance: `node tools/ride.mjs src/levels/level-01.json` and the other scripts in `tools/` (see `tools/README.md`). Playwright 1.63.0 is a devDependency; on a new machine run `npx playwright install chromium` once.
 - Other automated checks are ad hoc Playwright scripts against the dev server (`http://localhost:5173/Mobile-game/`), using `window.game.scene.getScene('game')` to place the player and freeze an officer. There is no test runner in the project yet.
 
 ## Not built yet
 
-Sound, menus, more levels, cosmetic selection screen, saving best times, police chasing or alert states beyond the catch meter.
+Sound beyond the coin pickup, a level select, more levels, skin tone choice, saving best times, police chasing or alert states beyond the catch meter, a pause or quit button during a run.

@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from './config';
 import { GameScene } from './scenes/GameScene';
+import { LockerScene } from './scenes/LockerScene';
+import { MenuScene } from './scenes/MenuScene';
 import { ResultScene } from './scenes/ResultScene';
 
 const game = new Phaser.Game({
@@ -15,7 +17,8 @@ const game = new Phaser.Game({
   },
   // Two touch points: one for the joystick, one spare (e.g. a button tap).
   input: { activePointers: 2 },
-  scene: [GameScene, ResultScene],
+  // The first scene in the list starts on load.
+  scene: [MenuScene, GameScene, ResultScene, LockerScene],
 });
 
 // Exposed in development only, for browser-console debugging and automated tests.

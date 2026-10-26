@@ -10,7 +10,7 @@ Run `npm install` in the repository root. It installs Playwright 1.63.0. On a ne
 npx playwright install chromium
 ```
 
-To use a Chromium that is already installed elsewhere, set `CHROMIUM_PATH` to its executable. No dev server needs to be running; each script starts and stops its own.
+To use a Chromium that is already installed elsewhere, set `CHROMIUM_PATH` to its executable. No dev server needs to be running; each script starts and stops its own. The game opens on the main menu; the scripts start the level scene directly.
 
 ## Running
 
@@ -30,7 +30,7 @@ Rides every marching group from its spawn to the finish, once per cycle (default
 node tools/ride.mjs src/levels/level-01.json --cycles 12
 ```
 
-Each line is one ride: the crowd's index in the level's `crowds` list, the cycle, when that group spawned, and the outcome (`finished`, `CAUGHT`, or `group vanished` if the group reached its end before the player reached the finish). `peak` is the highest the suspicion meter got, in ms; 500 means caught. `at` is where that peak happened. The last part lists, per officer (index in the level's `officers` list), the longest unbroken time that officer saw the player. An officer above about 1500 ms is the one to fix. The summary line gives survived rides out of total and the worst peak. Level 1 gives 24 of 24, worst peak 464 ms.
+Each line is one ride: the crowd's index in the level's `crowds` list, the cycle, when that group spawned, and the outcome (`finished`, `CAUGHT`, or `group vanished` if the group reached its end before the player reached the finish). `peak` is the highest the suspicion meter got, in ms; 500 means caught. `at` is where that peak happened. Next comes the finish time and the payout: coins picked up on the way plus the speed bonus. The finish time includes waiting at the start for that cycle's group, so later cycles earn the minimum bonus. The last part lists, per officer (index in the level's `officers` list), the longest unbroken time that officer saw the player. An officer above about 1500 ms is the one to fix. The summary gives survived rides out of total, the worst peak, and per crowd the coins a finished ride earns. Level 1 gives 24 of 24, worst peak 464 ms, and 60 (crowd 0) or 51 (crowd 1) coins when joining the first group. That figure is a "good run" for pricing shop items.
 
 ## blind.mjs: how risky is the same route alone?
 
@@ -76,6 +76,17 @@ The output says whether a route exists and when it reaches the finish, or when e
 
 The hiding rules are copied from GameScene (1.1 speed margin, 25 units/s floor, 25 percent rate). Update `solve.mjs` if those constants change in `src/config.ts`.
 
+## coins.mjs: where do the coins sit?
+
+For every coin in the level, reports whether riding a marching group picks it up, how much of the time some officer sees the spot (over 60 s, `--seconds`), and how often a solo dash gets caught. The dash runs at full speed from the nearest point on any marching path to the coin and straight back, with no crowd cover, from 40 start times 1.5 s apart (`--every ms`). It knows nothing about timing, like blind.mjs. `--try "x,y;x,y"` adds candidate spots to the report without editing the level.
+
+```
+node tools/coins.mjs src/levels/level-01.json
+node tools/coins.mjs src/levels/level-01.json --try "60,650;480,1350"
+```
+
+Common coins should say `on crowd N's route` (riding picks them up) and get caught on 0 dashes. Valuable coins should be more than the crowd radius (75) from every route, so a rider cannot drift over while hidden, and catch a blind dash in at least 40 percent of start times. Level 1's three valuable coins are caught on 28, 18 and 18 of 40 dashes. `(straight dash crosses an obstacle)` means the real route is longer than the measured one.
+
 ## coverage.mjs: where are the safe pockets?
 
 Replays 60 s of officer movement (`--seconds N`) and colours the level: green squares were never inside a cone, red ones were, with darker red meaning more of the time.
@@ -88,4 +99,4 @@ Green pockets behind cars and buildings are where a solo player waits. A route w
 
 ## Balancing workflow
 
-Edit the level JSON, then run ride.mjs (crowds safe), blind.mjs (solo risky), stand.mjs (standing groups useful) and solve.mjs (solo still possible). When a crowd ride fails, look at the officer with the longest sighting. Officers walking the same direction as a crowd, just behind it, are the usual cause; crosswise sweeps with narrow cones are kinder to crowds.
+Edit the level JSON, then run ride.mjs (crowds safe), blind.mjs (solo risky), stand.mjs (standing groups useful), solve.mjs (solo still possible) and coins.mjs (route coins safe, valuable coins risky). When a crowd ride fails, look at the officer with the longest sighting. Officers walking the same direction as a crowd, just behind it, are the usual cause; crosswise sweeps with narrow cones are kinder to crowds.

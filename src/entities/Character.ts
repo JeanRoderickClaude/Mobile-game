@@ -1,12 +1,13 @@
 import Phaser from 'phaser';
 import { CHARACTER_SCALE } from '../config';
-import { BODIES, DEFAULT_LOOK, HATS, OUTFITS, type PlayerLook } from './cosmetics';
+import { BODIES, DEFAULT_LOOK, HATS, OUTFITS, SIGNS, type PlayerLook } from './cosmetics';
 
 /**
  * A protestor: the player or a crowd member. Drawn from stacked layers so each
  * can be swapped on its own:
  *   body  - hands and skin tone (also used for the head)
  *   outfit - shirt, hoodie, coat
+ *   sign  - a carried sign or flag, held out ahead of the player
  *   head  - drawn from the body's skin tone, above the outfit
  *   hat   - topmost layer
  * The player also gets a marker ring underneath so they stand out in a crowd.
@@ -24,11 +25,12 @@ export interface CharacterOptions {
 }
 
 const BAKE_RES = 2; // baked textures are drawn at this multiple for sharpness
-const BAKE_SIZE = 48 * BAKE_RES; // covers local space -24..24
+const BAKE_SIZE = 64 * BAKE_RES; // covers local space -32..32, enough for a sign
 
 export class Character extends Phaser.GameObjects.Container {
   private bodyLayer: Phaser.GameObjects.Graphics;
   private outfitLayer: Phaser.GameObjects.Graphics;
+  private signLayer: Phaser.GameObjects.Graphics;
   private headLayer: Phaser.GameObjects.Graphics;
   private hatLayer: Phaser.GameObjects.Graphics;
   private look: PlayerLook;
@@ -46,10 +48,12 @@ export class Character extends Phaser.GameObjects.Container {
     }
     this.bodyLayer = scene.make.graphics({}, false);
     this.outfitLayer = scene.make.graphics({}, false);
+    this.signLayer = scene.make.graphics({}, false);
     this.headLayer = scene.make.graphics({}, false);
     this.hatLayer = scene.make.graphics({}, false);
     this.redrawBody();
     this.redrawOutfit();
+    this.redrawSign();
     this.redrawHat();
     if (options.baked) {
       // Created after the layers are drawn, so the first bake sees every layer.
@@ -57,7 +61,7 @@ export class Character extends Phaser.GameObjects.Container {
       this.add(this.image);
       this.bake();
     } else {
-      this.add([this.bodyLayer, this.outfitLayer, this.headLayer, this.hatLayer]);
+      this.add([this.bodyLayer, this.outfitLayer, this.signLayer, this.headLayer, this.hatLayer]);
     }
     this.setScale(CHARACTER_SCALE);
     scene.add.existing(this);
@@ -83,6 +87,17 @@ export class Character extends Phaser.GameObjects.Container {
     this.look.hat = id;
     this.redrawHat();
     return this;
+  }
+
+  setSign(id: PlayerLook['sign']): this {
+    this.look.sign = id;
+    this.redrawSign();
+    return this;
+  }
+
+  /** Swap every layer to match a look. */
+  setLook(look: PlayerLook): this {
+    return this.setBodyStyle(look.body).setOutfit(look.outfit).setSign(look.sign).setHat(look.hat);
   }
 
   /** Turn to face a movement direction (unless turn is false) and swing the hands while walking. */
@@ -125,6 +140,12 @@ export class Character extends Phaser.GameObjects.Container {
     this.bake();
   }
 
+  private redrawSign(): void {
+    this.signLayer.clear();
+    SIGNS[this.look.sign].draw(this.signLayer);
+    this.bake();
+  }
+
   private redrawHat(): void {
     this.hatLayer.clear();
     HATS[this.look.hat].draw(this.hatLayer);
@@ -134,11 +155,12 @@ export class Character extends Phaser.GameObjects.Container {
   /** For baked characters: point the image at the texture for the current look, rendering it once if new. */
   private bake(): void {
     if (!this.image) return;
-    const key = `character:${String(this.look.body)}:${String(this.look.outfit)}:${String(this.look.hat)}`;
+    const { body, outfit, sign, hat } = this.look;
+    const key = `character:${String(body)}:${String(outfit)}:${String(sign)}:${String(hat)}`;
     const textures = this.scene.textures;
     if (!textures.exists(key)) {
       const dt = textures.addDynamicTexture(key, BAKE_SIZE, BAKE_SIZE)!;
-      const layers = [this.bodyLayer, this.outfitLayer, this.headLayer, this.hatLayer];
+      const layers = [this.bodyLayer, this.outfitLayer, this.signLayer, this.headLayer, this.hatLayer];
       for (const g of layers) g.setScale(BAKE_RES);
       dt.draw(layers, BAKE_SIZE / 2, BAKE_SIZE / 2).render();
       for (const g of layers) g.setScale(1);

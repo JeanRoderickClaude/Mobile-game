@@ -34,5 +34,12 @@ function validate(level: LevelData, path: string): LevelData {
       fail(`crowd ${i} "type" must be "marching" or "standing"`);
     }
   });
+  level.coins ??= [];
+  if (!Array.isArray(level.coins)) fail('"coins" must be an array');
+  level.coins.forEach((c, i) => {
+    if (typeof c.x !== 'number' || typeof c.y !== 'number') fail(`coin ${i} needs "x" and "y"`);
+    if (c.value !== undefined && !(Number.isInteger(c.value) && c.value > 0)) fail(`coin ${i} "value" must be a positive whole number`);
+  });
+  if (level.parTimeSec !== undefined && !(level.parTimeSec > 0)) fail('"parTimeSec" must be positive');
   return level;
 }

@@ -37,14 +37,22 @@ await run(args._[0], async (page) => {
         if (s.finished) { outcome = s.suspicion >= 500 ? 'CAUGHT' : 'finished'; break; }
         if (!g.active) { outcome = 'group vanished'; break; }
       }
-      out.push({ group: gi, cycle, startSec, outcome, peak: Math.round(peak), peakAt, longest });
+      out.push({
+        group: gi, cycle, startSec, outcome, peak: Math.round(peak), peakAt, longest,
+        coins: s.runCoins, bonus: s.bonus, timeSec: s.elapsedMs / 1000,
+      });
     }
     return out;
   }, args.cycles ?? 12);
   for (const r of rows) {
     const seen = Object.entries(r.longest).map(([i, ms]) => `#${i} ${ms}ms`).join(', ') || 'none';
-    console.log(`crowd ${r.group} cycle ${String(r.cycle).padStart(2)} (spawn ${r.startSec.toFixed(1)}s): ${r.outcome.padEnd(8)} peak ${String(r.peak).padStart(3)}ms at ${r.peakAt ?? '-'} | longest sighting by officer: ${seen}`);
+    const pay = r.outcome === 'finished' ? `${r.timeSec.toFixed(1)}s, ${r.coins} coins + ${r.bonus} bonus` : `${r.coins} coins lost`;
+    console.log(`crowd ${r.group} cycle ${String(r.cycle).padStart(2)} (spawn ${r.startSec.toFixed(1)}s): ${r.outcome.padEnd(8)} peak ${String(r.peak).padStart(3)}ms at ${r.peakAt ?? '-'} | ${pay} | longest sighting by officer: ${seen}`);
   }
   const ok = rows.filter((r) => r.outcome === 'finished').length;
   console.log(`\n${ok} of ${rows.length} rides survived. Worst peak ${Math.max(...rows.map((r) => r.peak))}ms (caught at 500).`);
+  for (const g of [...new Set(rows.map((r) => r.group))]) {
+    const won = rows.filter((r) => r.group === g && r.outcome === 'finished').map((r) => r.coins + r.bonus);
+    if (won.length) console.log(`crowd ${g}: earned ${Math.min(...won)}-${Math.max(...won)} coins per finished ride, ${won[0]} when joining its first group.`);
+  }
 });

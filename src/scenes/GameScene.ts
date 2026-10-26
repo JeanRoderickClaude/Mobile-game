@@ -1,16 +1,20 @@
 import Phaser from 'phaser';
 import {
-  CATCH_TIME_MS, CHARACTER_SCALE, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
+  CATCH_TIME_MS, CHARACTER_SCALE, COIN_PICKUP_RADIUS, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
   PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR,
 } from '../config';
 import { Character } from '../entities/Character';
-import { DEFAULT_LOOK } from '../entities/cosmetics';
+import { Coin } from '../entities/Coin';
 import { Crowd } from '../entities/Crowd';
 import { PoliceOfficer } from '../entities/PoliceOfficer';
 import { LEVELS } from '../levels';
 import type { LevelData, Obstacle, Rect } from '../levels/types';
+import { finishBonus } from '../systems/economy';
 import { overlaps } from '../systems/geometry';
+import { addCoins, equippedLook, getCoins } from '../systems/save';
+import { playCoin } from '../systems/sfx';
 import { VirtualJoystick } from '../systems/VirtualJoystick';
+import { CoinLabel } from '../ui/widgets';
 import type { ResultData } from './ResultScene';
 
 export interface GameSceneData {
@@ -23,6 +27,10 @@ export class GameScene extends Phaser.Scene {
   private player!: Character;
   private officers: PoliceOfficer[] = [];
   private crowds: Crowd[] = [];
+  private coins: Coin[] = [];
+  private runCoins = 0; // collected this run, paid out only at the finish
+  private bonus = 0; // speed bonus paid at the finish
+  private coinLabel!: CoinLabel;
   private blockers: Rect[] = [];
   private joystick!: VirtualJoystick;
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift', Phaser.Input.Keyboard.Key>;
@@ -44,6 +52,9 @@ export class GameScene extends Phaser.Scene {
     this.level = LEVELS[this.levelIndex];
     this.officers = [];
     this.crowds = [];
+    this.coins = [];
+    this.runCoins = 0;
+    this.bonus = 0;
     this.playerSpeed = 0;
     this.hidden = false;
     this.blockers = this.level.obstacles;
@@ -66,7 +77,9 @@ export class GameScene extends Phaser.Scene {
 
     this.crowds = (this.level.crowds ?? []).map((d) => new Crowd(this, d));
 
-    this.player = new Character(this, this.level.start.x, this.level.start.y, DEFAULT_LOOK, { marker: true }).setDepth(30);
+    this.coins = (this.level.coins ?? []).map((d) => new Coin(this, d));
+
+    this.player = new Character(this, this.level.start.x, this.level.start.y, equippedLook(), { marker: true }).setDepth(30);
     this.cameras.main.startFollow(this.player, true, 1, 0.15);
 
     this.meter = this.add.graphics().setDepth(40);
@@ -88,6 +101,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setScrollFactor(0)
       .setDepth(90);
+    this.coinLabel = new CoinLabel(this, 16, 64, 0).setScrollFactor(0).setDepth(90);
   }
 
   update(_time: number, delta: number): void {
@@ -97,6 +111,7 @@ export class GameScene extends Phaser.Scene {
     this.elapsedMs += dt;
 
     this.movePlayer(dt);
+    this.collectCoins();
     for (const o of this.officers) o.update(dt);
     for (const c of this.crowds) c.update(dt);
     this.updateDetection(dt);
@@ -133,6 +148,19 @@ export class GameScene extends Phaser.Scene {
     // Measured after collision, so pushing into a wall counts as standing still.
     this.playerSpeed = dt > 0 ? (Math.hypot(this.player.x - fromX, this.player.y - fromY) * 1000) / dt : 0;
     this.player.updateMotion(dx, dy, dt);
+  }
+
+  private collectCoins(): void {
+    for (const c of this.coins) {
+      if (c.collected || Math.hypot(c.x - this.player.x, c.y - this.player.y) > COIN_PICKUP_RADIUS) continue;
+      c.collect();
+      this.runCoins += c.value;
+      this.coinLabel.setValue(this.runCoins);
+      this.tweens.killTweensOf(this.coinLabel);
+      this.coinLabel.setScale(1);
+      this.tweens.add({ targets: this.coinLabel, scale: 1.25, duration: 90, yoyo: true });
+      playCoin(this, c.valuable);
+    }
   }
 
   /** Returns the corrected coordinate on one axis after pushing out of blockers and world edges. */
@@ -196,9 +224,15 @@ export class GameScene extends Phaser.Scene {
   private end(outcome: ResultData['outcome']): void {
     this.finished = true;
     this.scene.pause();
+    // Coins only count once the route is complete; getting caught loses them all.
+    this.bonus = outcome === 'complete' ? finishBonus(this.elapsedMs, this.level) : 0;
+    if (outcome === 'complete') addCoins(this.runCoins + this.bonus);
     const data: ResultData = {
       outcome,
       elapsedMs: this.elapsedMs,
+      coins: this.runCoins,
+      bonus: this.bonus,
+      balance: getCoins(),
       levelIndex: this.levelIndex,
       hasNextLevel: this.levelIndex + 1 < LEVELS.length,
     };

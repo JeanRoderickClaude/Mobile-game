@@ -46,6 +46,9 @@ export async function run(levelFile, fn) {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto(url);
+    // The game opens on the menu; start the level scene directly.
+    await page.waitForFunction(() => window.game?.scene.getScene('menu')?.sys.isActive());
+    await page.evaluate((levelIndex) => window.game.scene.getScene('menu').scene.start('game', { levelIndex }), index);
     await page.waitForFunction(() => window.game?.scene.getScene('game')?.player);
     await page.evaluate((levelIndex) => {
       window.__restart = async () => {
