@@ -22,13 +22,18 @@ node tools/ride.mjs src/levels/level-01.json
 
 Flags go after the level file. A script that runs the whole level many times takes a minute or two.
 
+Every script takes `--difficulty easy` or `--difficulty normal` (default normal). It sets the catch time and cone length the same way the game does, and the first output line says which one ran. Running several scripts at once slows the machine and can shift results by a few ms; run them one at a time for exact numbers.
+
 ## ride.mjs: is riding a crowd safe?
 
 Rides every marching group from its spawn to the finish, once per cycle (default 12 cycles, `--cycles N`). Each cycle starts later, so the officers are at different points of their patrols. The simulated player steers toward the group centre and never moves faster than 105 percent of the group's pace, so it stays hidden the whole way.
 
 ```
 node tools/ride.mjs src/levels/level-01.json --cycles 12
+node tools/ride.mjs src/levels/level-01.json --assist --difficulty easy
 ```
+
+`--assist` replaces the precise steering with a casual thumb: a three-quarter joystick push along the group's heading, nudged toward its centre, leaving the speed to the crowd pace assist. Level 1 gives 23 of 24 on Normal and 24 of 24 on Easy.
 
 Each line is one ride: the crowd's index in the level's `crowds` list, the cycle, when that group spawned, and the outcome (`finished`, `CAUGHT`, or `group vanished` if the group reached its end before the player reached the finish). `peak` is the highest the suspicion meter got, in ms; 500 means caught. `at` is where that peak happened. Next comes the finish time and the payout: coins picked up on the way plus the speed bonus. The finish time includes waiting at the start for that cycle's group, so later cycles earn the minimum bonus. The last part lists, per officer (index in the level's `officers` list), the longest unbroken time that officer saw the player. An officer above about 1500 ms is the one to fix. The summary gives survived rides out of total, the worst peak, and per crowd the coins a finished ride earns. Level 1 gives 24 of 24, worst peak 464 ms, and 60 (crowd 0) or 51 (crowd 1) coins when joining the first group. That figure is a "good run" for pricing shop items.
 
@@ -40,7 +45,7 @@ Walks each marching group's path with no crowd protection, once at full speed an
 node tools/blind.mjs src/levels/level-01.json
 ```
 
-Each line gives start times survived out of total. Compare with ride.mjs: if crowds are the safe route, blind runs should mostly fail. Level 1 gives 5 of 23 at full speed.
+Each line gives start times survived out of total. Compare with ride.mjs: if crowds are the safe route, blind runs should mostly fail. Level 1 gives 5 of 23 at full speed on Normal and 23 of 23 on Easy.
 
 ## stand.mjs: are the standing groups worth using?
 
@@ -72,7 +77,7 @@ node tools/solve.mjs src/levels/level-01.json --range-mul 1.2 --angle-add 10
 node tools/solve.mjs src/levels/level-01.json --crowds --draw route.png
 ```
 
-The output says whether a route exists and when it reaches the finish, or when every option got caught. `--range-mul` and `--angle-add` make every cone bigger: if a route still exists, the solo route has slack. `--cap ms` sets the catch threshold, so `--cap 1` asks for a route on which the player is never seen at all. `--crowds` lets the search hide in crowds. `--max-sec` limits the search (default 120). `--draw file.png` saves a picture of the whole level with the route in magenta and labels in seconds along it. The search knows the future, so it is much better than a person. Use it to answer "is this possible at all", and use blind.mjs for "is this easy".
+The output says whether a route exists and when it reaches the finish, or when every option got caught. `--range-mul` and `--angle-add` make every cone bigger: if a route still exists, the solo route has slack. `--cap ms` sets the catch threshold (default: the difficulty's catch time), so `--cap 1` asks for a route on which the player is never seen at all. `--crowds` lets the search hide in crowds. `--max-sec` limits the search (default 120). `--draw file.png` saves a picture of the whole level with the route in magenta and labels in seconds along it. The search knows the future, so it is much better than a person. Use it to answer "is this possible at all", and use blind.mjs for "is this easy".
 
 The hiding rules are copied from GameScene (1.1 speed margin, 25 units/s floor, 25 percent rate). Update `solve.mjs` if those constants change in `src/config.ts`.
 
@@ -85,7 +90,7 @@ node tools/coins.mjs src/levels/level-01.json
 node tools/coins.mjs src/levels/level-01.json --try "60,650;480,1350"
 ```
 
-Common coins should say `on crowd N's route` (riding picks them up) and get caught on 0 dashes. Valuable coins should be more than the crowd radius (75) from every route, so a rider cannot drift over while hidden, and catch a blind dash in at least 40 percent of start times. Level 1's three valuable coins are caught on 28, 18 and 18 of 40 dashes. `(straight dash crosses an obstacle)` means the real route is longer than the measured one.
+Common coins should say `on crowd N's route` (riding picks them up) and get caught on 0 dashes. Valuable coins should be more than the crowd radius (75) from every route, so a rider cannot drift over while hidden, and catch a blind dash in at least 40 percent of start times. Level 1's three valuable coins are caught on 28, 18 and 18 of 40 dashes on Normal, and 5, 4 and 2 on Easy. `(straight dash crosses an obstacle)` means the real route is longer than the measured one.
 
 ## coverage.mjs: where are the safe pockets?
 

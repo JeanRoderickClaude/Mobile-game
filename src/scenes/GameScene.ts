@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  ASSIST_ANGLE_DEG, ASSIST_BREAK_STRENGTH, ASSIST_FLOOR_FACTOR, ASSIST_PACE_FACTOR, CHARACTER_SCALE, COIN_PICKUP_RADIUS, DIFFICULTIES, type Difficulty, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
+  ASSIST_ANGLE_DEG, ASSIST_BREAK_STRENGTH, ASSIST_FLOOR_FACTOR, ASSIST_PACE_MAX, ASSIST_PACE_MIN, ASSIST_SETTLE_DIST, CHARACTER_SCALE, COIN_PICKUP_RADIUS, DIFFICULTIES, type Difficulty, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
   PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR,
 } from '../config';
 import { Character } from '../entities/Character';
@@ -210,7 +210,12 @@ export class GameScene extends Phaser.Scene {
     for (const c of this.crowds) {
       if (!c.contains(this.player.x, this.player.y)) continue;
       if (c.speed === 0) standing = true;
-      else if ((dx * c.headingX + dy * c.headingY) / len >= minDot) marching = Math.max(marching, c.speed * ASSIST_PACE_FACTOR);
+      else if ((dx * c.headingX + dy * c.headingY) / len >= minDot) {
+        // Ahead of the centre: slower than the group; behind: a little faster. The player drifts back to the middle.
+        const ahead = (this.player.x - c.x) * c.headingX + (this.player.y - c.y) * c.headingY;
+        const factor = Phaser.Math.Clamp(1 - ahead / ASSIST_SETTLE_DIST, ASSIST_PACE_MIN, ASSIST_PACE_MAX);
+        marching = Math.max(marching, c.speed * factor);
+      }
     }
     if (marching > 0) return marching;
     return standing ? HIDE_SPEED_FLOOR * ASSIST_FLOOR_FACTOR : Infinity;

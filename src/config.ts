@@ -43,13 +43,17 @@ export const HIDE_SPEED_MARGIN = 1.1;
 // ...or no faster than this, so standing groups (speed 0) allow a slow shuffle.
 export const HIDE_SPEED_FLOOR = 25;
 // Crowd pace assist: inside a marching group with input within this angle of
-// the group's heading, speed is capped at the group's pace times
-// ASSIST_PACE_FACTOR (under HIDE_SPEED_MARGIN, so the player can slowly catch
-// up while staying hidden). In a standing group the cap is HIDE_SPEED_FLOOR
-// times ASSIST_FLOOR_FACTOR. A joystick pushed to ASSIST_BREAK_STRENGTH or
-// more, or the sprint key (Space), skips the cap.
+// the group's heading, speed is capped near the group's pace. The cap settles
+// the player toward the group centre: pace x (1 - distance ahead of centre /
+// ASSIST_SETTLE_DIST), kept between ASSIST_PACE_MIN and ASSIST_PACE_MAX (under
+// HIDE_SPEED_MARGIN, so catching up still counts as hidden). In a standing
+// group the cap is HIDE_SPEED_FLOOR times ASSIST_FLOOR_FACTOR. A joystick
+// pushed to ASSIST_BREAK_STRENGTH or more, or the sprint key (Space), skips
+// the cap.
 export const ASSIST_ANGLE_DEG = 60;
-export const ASSIST_PACE_FACTOR = 1.05;
+export const ASSIST_SETTLE_DIST = 150;
+export const ASSIST_PACE_MIN = 0.85;
+export const ASSIST_PACE_MAX = 1.08;
 export const ASSIST_FLOOR_FACTOR = 0.95;
 export const ASSIST_BREAK_STRENGTH = 0.95;
 
