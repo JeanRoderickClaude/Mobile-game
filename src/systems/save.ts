@@ -1,6 +1,7 @@
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, type Difficulty } from '../config';
 import { DEFAULT_ITEMS, DEFAULT_LOOK, isKnownItem, type PlayerLook } from '../entities/cosmetics';
 import { itemById, type ItemCategory, type ShopItem } from '../data/items';
+import { isFlagValue, type FlagValue, type Flags } from '../story/flags';
 
 // Player progress: coin balance, bought items and the equipped look. Kept in
 // memory and mirrored to localStorage. Storage can be blocked (private mode,
@@ -8,7 +9,9 @@ import { itemById, type ItemCategory, type ShopItem } from '../data/items';
 // runs, it just forgets progress on reload.
 
 /** Bump the version when the stored shape changes incompatibly. */
-export const SAVE_KEY = 'protest-route.save.v1';
+export const SAVE_KEY = 'protest-route.save.v2';
+/** Older keys, newest first. The first one found is migrated into SAVE_KEY and left in place. */
+const OLD_KEYS = ['protest-route.save.v1'];
 
 export interface SaveData {
   coins: number;
@@ -17,27 +20,46 @@ export interface SaveData {
   equipped: Record<ItemCategory, string>;
   /** Saves from before difficulties existed load as DEFAULT_DIFFICULTY. */
   difficulty: Difficulty;
+  /** Ids of finished chapters (see src/story/chapters.json). */
+  completed: string[];
+  /** Story flags set by dialogue choices. */
+  flags: Flags;
 }
 
 function fresh(): SaveData {
-  return { coins: 0, owned: [], equipped: { ...DEFAULT_ITEMS }, difficulty: DEFAULT_DIFFICULTY };
+  return { coins: 0, owned: [], equipped: { ...DEFAULT_ITEMS }, difficulty: DEFAULT_DIFFICULTY, completed: [], flags: {} };
 }
 
 let state: SaveData = load();
 
 function load(): SaveData {
   let raw: string | null = null;
+  let migrated = false;
   try {
     raw = window.localStorage.getItem(SAVE_KEY);
+    for (let i = 0; !raw && i < OLD_KEYS.length; i++) {
+      raw = window.localStorage.getItem(OLD_KEYS[i]);
+      migrated = raw !== null;
+    }
   } catch {
     return fresh();
   }
   if (!raw) return fresh();
+  let data: SaveData;
   try {
-    return sanitize(JSON.parse(raw));
+    // v1 saves have no story fields; sanitize fills them in as empty.
+    data = sanitize(JSON.parse(raw));
   } catch {
     return fresh();
   }
+  if (migrated) {
+    try {
+      window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    } catch {
+      // Storage blocked: the migrated save lives for this session only.
+    }
+  }
+  return data;
 }
 
 /** Keeps only well-formed values, so a hand-edited or old save cannot break the game. */
@@ -54,6 +76,10 @@ function sanitize(input: unknown): SaveData {
     }
   }
   if (typeof data.difficulty === 'string' && Object.hasOwn(DIFFICULTIES, data.difficulty)) out.difficulty = data.difficulty;
+  if (Array.isArray(data.completed)) out.completed = [...new Set(data.completed.filter((id) => typeof id === 'string'))];
+  if (data.flags && typeof data.flags === 'object' && !Array.isArray(data.flags)) {
+    for (const [name, value] of Object.entries(data.flags)) if (isFlagValue(value)) out.flags[name] = value;
+  }
   return out;
 }
 
@@ -108,6 +134,26 @@ export function getDifficulty(): Difficulty {
 
 export function setDifficulty(difficulty: Difficulty): void {
   state.difficulty = difficulty;
+  persist();
+}
+
+export function isChapterDone(id: string): boolean {
+  return state.completed.includes(id);
+}
+
+export function completeChapter(id: string): void {
+  if (isChapterDone(id)) return;
+  state.completed.push(id);
+  persist();
+}
+
+/** A copy of the story flags. */
+export function getFlags(): Flags {
+  return { ...state.flags };
+}
+
+export function setFlags(values: Record<string, FlagValue>): void {
+  Object.assign(state.flags, values);
   persist();
 }
 

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { CoinLabel, FONT, FONT_BOLD, makeButton } from '../ui/widgets';
-import { formatTime } from './GameScene';
+import { startChapter } from '../story/story';
+import { formatTime, type GameSceneData } from './GameScene';
 
 export interface ResultData {
   outcome: 'caught' | 'complete';
@@ -14,6 +15,9 @@ export interface ResultData {
   balance: number;
   levelIndex: number;
   hasNextLevel: boolean;
+  /** Set when the run was a story chapter: buttons lead through chapters instead of levels. */
+  chapterIndex?: number;
+  hasNextChapter: boolean;
 }
 
 /** Overlay shown on top of the paused GameScene. */
@@ -26,7 +30,8 @@ export class ResultScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
     const caught = data.outcome === 'caught';
-    const next = !caught && data.hasNextLevel;
+    const story = data.chapterIndex !== undefined;
+    const next = !caught && (story ? data.hasNextChapter : data.hasNextLevel);
     const buttons = 2 + (next ? 1 : 0);
     const panelH = (caught ? 260 : 400) + buttons * 70;
     const top = cy - panelH / 2;
@@ -59,24 +64,31 @@ export class ResultScene extends Phaser.Scene {
       y = top + 400;
     }
 
-    const restart = () => this.restart(data.levelIndex);
-    makeButton(this, cx, y, 'Restart', restart);
-    if (next) makeButton(this, cx, (y += 70), 'Next level', () => this.restart(data.levelIndex + 1));
-    makeButton(this, cx, y + 70, 'Menu', () => this.toMenu());
+    // Restarting a chapter skips its intro; "Next chapter" plays the next intro.
+    const restart = () => this.restart({ levelIndex: data.levelIndex, chapterIndex: data.chapterIndex });
+    makeButton(this, cx, y, caught ? 'Try again' : story ? 'Replay' : 'Restart', restart);
+    if (next && story) makeButton(this, cx, (y += 70), 'Next chapter', () => this.nextChapter(data.chapterIndex! + 1));
+    else if (next) makeButton(this, cx, (y += 70), 'Next level', () => this.restart({ levelIndex: data.levelIndex + 1 }));
+    makeButton(this, cx, y + 70, story ? 'Chapters' : 'Menu', () => this.leave(story ? 'chapters' : 'menu'));
 
     const kb = this.input.keyboard!;
     kb.once('keydown-ENTER', restart);
     kb.once('keydown-SPACE', restart);
     kb.once('keydown-R', restart);
-    kb.once('keydown-ESC', () => this.toMenu());
+    kb.once('keydown-ESC', () => this.leave(story ? 'chapters' : 'menu'));
   }
 
-  private restart(levelIndex: number): void {
-    this.scene.start('game', { levelIndex });
+  private restart(data: GameSceneData): void {
+    this.scene.start('game', data);
   }
 
-  private toMenu(): void {
+  private nextChapter(index: number): void {
     this.scene.stop('game');
-    this.scene.start('menu');
+    startChapter(this, index);
+  }
+
+  private leave(key: 'menu' | 'chapters'): void {
+    this.scene.stop('game');
+    this.scene.start(key);
   }
 }

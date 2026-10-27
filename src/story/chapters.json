@@ -1,0 +1,10 @@
+[
+  { "id": "ch1", "title": "Last Song", "level": "level-01", "intro": "ch1-intro", "outro": "ch1-outro" },
+  { "id": "ch2", "title": "Strike Up" },
+  { "id": "ch3", "title": "Night Posters" },
+  { "id": "ch4", "title": "The Raid" },
+  { "id": "ch5", "title": "Drummer Boy" },
+  { "id": "ch6", "title": "Roadblocks" },
+  { "id": "ch7", "title": "Velvet Heights" },
+  { "id": "ch8", "title": "The Big Noise" }
+]

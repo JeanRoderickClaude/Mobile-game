@@ -2,6 +2,8 @@
 
 A top-down cartoon browser game. The player is a protestor who walks a route from a start point to a finish line without being caught by police. Runs in portrait on desktop and in phone browsers.
 
+The game is a story mode in eight chapters. The story outline lives in `docs/story.md`: read it before writing chapters, levels or dialogue, and keep new content consistent with it (setting, characters, tone, the one-new-element-per-chapter rule, fixed chapter order).
+
 Live build: https://jeanroderickclaude.github.io/Mobile-game/ (redeployed on every push to `main`).
 
 The live site is the owner's personal test build. When the owner asks for a feature to go live, merging it into `main` and pushing is approved.
@@ -27,10 +29,13 @@ The live site is the owner's personal test build. When the owner asks for a feat
 - `index.html`: page shell, full-screen `#game` div, touch scrolling off.
 - `src/main.ts`: Phaser game config (540x960 design size, `Scale.FIT`, centred, 2 touch pointers). Starts on the menu. Exposes `window.game` in dev only.
 - `src/config.ts`: tuning constants (speeds, difficulties, crowd pace assist, character scale, colours).
-- `src/scenes/MenuScene.ts`: first screen. Title, the equipped look, coin balance, Play (level 1) and Locker buttons, and an Easy / Normal difficulty switch. Enter or Space plays, L opens the locker.
+- `docs/story.md`: the story outline (setting, characters, the eight chapters, design rules).
+- `src/scenes/MenuScene.ts`: first screen. Title, the equipped look, coin balance, Play (opens the chapter map) and Locker buttons, and an Easy / Normal difficulty switch. Enter or Space opens the chapter map, L opens the locker.
+- `src/scenes/ChapterMapScene.ts`: the eight chapters by title with their state: Replay (done), Play (open), Coming soon (open but no level yet), Locked. Enter plays the furthest open chapter; Escape or Back returns to the menu.
+- `src/scenes/DialogueScene.ts`: story dialogue. Speaker name, placeholder portrait, text, choice buttons. Started standalone (intro, harbor backdrop) or as an overlay on the paused game (outro). Ends by starting or launching the scene it was given.
 - `src/scenes/LockerScene.ts`: the shop. Large character preview, Hats / Outfits / Signs tabs, item grid, Buy / Equip button. Escape or Back returns to the menu.
-- `src/scenes/GameScene.ts`: loads a level, draws street and obstacles, player input and collision, detection, coins, HUD timer and coin counter, payout at the end.
-- `src/scenes/ResultScene.ts`: "Caught" / "Route complete" overlay with the coin breakdown, Restart, "Next level" when one exists, and Menu. Enter, Space or R restart; Escape goes to the menu.
+- `src/scenes/GameScene.ts`: loads a level with the story flags applied, draws street and obstacles, player input and collision, detection, coins, HUD timer and coin counter, payout at the end. When started with a `chapterIndex` it marks the chapter done on finishing and plays its outro before the result.
+- `src/scenes/ResultScene.ts`: "Caught" / "Route complete" overlay with the coin breakdown. In a chapter: Try again / Replay (skips the intro), "Next chapter" when the next one has a level, and Chapters. Outside a chapter (balance tools): Restart, "Next level" and Menu. Enter, Space or R restart; Escape leaves.
 - `src/entities/Character.ts`: a protestor (player or crowd member), built from stacked layers. Crowd members are baked into one cached image.
 - `src/entities/Crowd.ts`: marching and standing groups of protestors the player can hide in.
 - `src/entities/cosmetics.ts`: tables of bodies (skin tones), outfits, hats and signs, the pools crowd members pick from, and the shape recipes that draw shop items.
@@ -43,7 +48,12 @@ The live site is the owner's personal test build. When the owner asks for a feat
 - `src/entities/PoliceOfficer.ts`: patrol movement, facing, vision test, cone drawing.
 - `src/systems/VirtualJoystick.ts`: floating touch joystick.
 - `src/systems/geometry.ts`: ray-vs-rectangle, line of sight, angle helpers.
-- `src/levels/*.json`: level data. `src/levels/types.ts` describes the format; `src/levels/index.ts` loads and checks it.
+- `src/levels/*.json`: level data. `src/levels/types.ts` describes the format; `src/levels/index.ts` loads and checks it; `src/levels/resolve.ts` applies story flags (conditional entries, modifiers).
+- `src/story/chapters.json`: the eight chapters in play order (id, title, level, intro, outro).
+- `src/story/cast.json`: speakers for dialogue (name, colour, portrait shape).
+- `src/story/dialogue/*.json`: dialogue scenes; the file name is the scene id.
+- `src/story/story.ts`: loads and checks chapters, cast and dialogue; chapter state (done / open / locked) and `startChapter`.
+- `src/story/flags.ts`: story flag and condition types, `matches`.
 - `tools/`: balance tools. Node scripts that start Vite, load a level in headless Chromium and measure difficulty: crowd rides (with coins earned), blind solo runs, standing groups, good standing spots, a perfect-knowledge route search, a cone coverage map and coin risk. `tools/README.md` explains each and how to read the output. Run them after any level change.
 
 ## Design decisions
@@ -57,7 +67,9 @@ The live site is the owner's personal test build. When the owner asks for a feat
 - Detection: an officer sees the player when the player's centre is within `visionRange`, within half of `visionAngle` of the officer's facing, and the segment between them crosses no obstacle. A suspicion meter fills while any officer sees the player and drains at twice that speed otherwise. While the player is hidden in a crowd it fills at `HIDDEN_DETECTION_RATE` (25 percent). At the difficulty's `catchTimeMs` (Normal 500 ms, Easy 1500 ms) the player is caught. A red bar above the player shows the meter.
 - Vision cones are drawn by casting `VISION_RAYS` rays per officer each frame, so the drawn cone is cut off by obstacles. What the player sees matches what the officer can see.
 - Officers walk their waypoints at `speed`, wait `pauseMs` at each one, and turn smoothly toward the next leg (also while waiting). `loop` routes return to the first point; `pingpong` routes walk back.
-- Levels are data. Every `src/levels/*.json` file is picked up by `import.meta.glob` and played in file-name order. Adding a level needs no code change; a "Next level" button appears after finishing when a next file exists. Bad data fails at startup with an error naming the file.
+- Levels are data. Every `src/levels/*.json` file is picked up by `import.meta.glob`. Players reach a level through the chapter that names it in `chapters.json`. The balance tools still start levels by file-name index. Bad data fails at startup with an error naming the file.
+- Story flow: Play → chapter map → chapter intro (if any) → level → on finishing, the chapter is saved as done, then the outro plays over the paused level, then the result screen. Getting caught shows the result screen with no outro. Chapter 1 is always open; each later chapter opens when the one before it is done. Finished chapters replay with full coin payout and play their intro and outro again (Skip ends them). A chapter with no `level` shows "Coming soon" once open.
+- Dialogue: tap or Space/Enter advances; Skip or Escape jumps to the next choice ahead, or ends the scene when none is left, so choices cannot be skipped past. While a choice is showing, Skip and tap-to-advance are off; tap a button or press 1-4. Input is ignored for the first 300 ms so a lifted finger or held key from the level does not skip a line. Replaying a chapter and picking differently overwrites the flag.
 - Crowds: defined per level. Marching groups walk their `path` at `speed` (default 60 percent of `PLAYER_SPEED`, 102) in a loose two-wide column that turns with the path, fade out at the end, and a new group starts at the first point `intervalMs` later. Standing groups shuffle in place at `x, y`. Protestors block nothing: not movement, not line of sight. A faint disc shows each group's `radius` (default `CROWD_RADIUS`, 75).
 - Hiding: the player is hidden while within a group's radius and moving no faster than `HIDE_SPEED_MARGIN` (1.1) times the group's speed, with a floor of `HIDE_SPEED_FLOOR` (25 units/s) so standing groups (speed 0) allow a slow shuffle. Player speed is measured after collision, so pushing into a wall counts as standing. A three-heads icon shows above the player while hidden.
 - The player wears a magenta vest (`vest-magenta`, kept out of the crowd pools) and a white marker ring, so they stay visible in a crowd.
@@ -73,7 +85,7 @@ The live site is the owner's personal test build. When the owner asks for a feat
 - Speed bonus: `FINISH_BONUS_MAX` (40) at or under the level's par time, falling in a straight line to `FINISH_BONUS_MIN` (10) at `FINISH_SLOW_FACTOR` (3) times par and slower. Par is the level's `parTimeSec`, or by default its height walked at full speed times `PAR_TIME_FACTOR` (1.2): 20.3 s for level 1.
 - Level 1 has 15 coins worth 135: 10 commons on the two crowd routes (5 per route), one at each standing group, and 3 valuable coins (25) in the side alleys at y 1350 and 1920 where officers sweep. Measured with `tools/ride.mjs` and `tools/coins.mjs`: riding a crowd collects its 5 route coins and never gets caught (24 of 24); a good run (joining the first group) earns 60 via crowd 0 (27.3 s, bonus 35) or 51 via crowd 1 (38.8 s, bonus 26). A blind solo dash from the nearest route to a valuable coin and back is caught on 28, 18 and 18 of 40 start times. Every valuable coin is at least 138 units from a crowd route, beyond the 75-unit crowd radius.
 - Prices: cheapest about two good runs (120), most expensive about ten (600).
-- Save data lives in localStorage under `protest-route.save.v1`: `{ "coins": 120, "owned": ["hat-bandana"], "equipped": { "hat": "hat-bandana", "outfit": "vest-magenta", "sign": "none" }, "difficulty": "easy" }`. A missing or unknown `difficulty` loads as Easy. Every read and write is wrapped in try/catch; if storage is blocked the game runs with progress kept in memory for the session. Loading drops unknown items, unowned equipped items and bad numbers. Bump the key's version when the shape changes incompatibly.
+- Save data lives in localStorage under `protest-route.save.v2`: `{ "coins": 120, "owned": ["hat-bandana"], "equipped": { "hat": "hat-bandana", "outfit": "vest-magenta", "sign": "none" }, "difficulty": "easy", "completed": ["ch1"], "flags": { "helpedRuby": true } }`. `completed` holds finished chapter ids; `flags` holds story flags (choices are stored as the flags they set). When v2 is missing, a `protest-route.save.v1` save is loaded, given empty `completed` and `flags`, and written to v2; the v1 key is left in place. A missing or unknown `difficulty` loads as Easy. Every read and write is wrapped in try/catch; if storage is blocked the game runs with progress kept in memory for the session. Loading drops unknown items, unowned equipped items and bad numbers. Bump the key's version when the shape changes incompatibly.
 - Default items (beanie, magenta vest, no sign) are always owned, never listed in `owned`, and shown first in each locker tab.
 
 ## Shop item format
@@ -119,6 +131,17 @@ Crowds are optional:
 
 `radius` (both types) and `speed` (marching) are optional. Members can overlap obstacles visually, so keep paths in open road where possible.
 
+Any obstacle, officer, crowd or coin entry can carry `"if"` (see Story flags below) and is only placed when it matches. Story-dependent tuning goes in `modifiers`:
+
+```json
+"modifiers": [
+  { "if": { "gaveNames": true }, "crowdSizeFactor": 0.6 },
+  { "if": { "taggedVan": true }, "visionRangeFactor": 1.15, "officerSpeedFactor": 1.1, "catchTimeFactor": 0.8 }
+]
+```
+
+Every matching modifier applies and factors multiply. `crowdSizeFactor` scales every crowd's `size` (rounded, at least 1); `visionRangeFactor` and `officerSpeedFactor` scale every officer; `catchTimeFactor` scales the difficulty's catch time (below 1 is more alert police). Unknown fields fail at startup. The balance tools run with an empty save, so they measure the level with no flags set; pass `flags` in the `game` scene data to test a variant.
+
 Coins and par time are optional:
 
 ```json
@@ -143,14 +166,53 @@ Level 1 by difficulty (`--difficulty normal` / `easy`):
 
 On Easy, walking the crowd routes alone at full speed always survives. That is the point of Easy for playtesting, but it means crowds and valuable coins carry little risk there.
 
+## Story data
+
+Chapters (`src/story/chapters.json`), in play order:
+
+```json
+{ "id": "ch1", "title": "Last Song", "level": "level-01", "intro": "ch1-intro", "outro": "ch1-outro" }
+```
+
+`id` is stored in saves; renaming one drops that chapter's progress. `level` is a level `id`; leave it out until the level exists. `intro` and `outro` are optional dialogue ids, or a list of variants where the first whose `if` matches plays (for chapter 8's three endings):
+
+```json
+"outro": [{ "scene": "ch8-end-full", "if": { "helpedRuby": true, "gaveNames": false } }, { "scene": "ch8-end-small" }]
+```
+
+Cast (`src/story/cast.json`), keyed by speaker id: `{ "pip": { "name": "Pip", "color": "#ff3fa4", "shape": "circle" } }`. Shapes: `circle`, `square`, `diamond`, `triangle`, `hexagon`, or `none` (narrator: no portrait, no name, italic text across the panel).
+
+Dialogue (`src/story/dialogue/<id>.json`):
+
+```json
+{
+  "lines": [
+    { "speaker": "ruby", "text": "Grab the tuba or run, kid!", "choices": [
+      { "text": "Carry the tuba", "set": { "helpedRuby": true } },
+      { "text": "Run", "set": { "helpedRuby": false } }
+    ] },
+    { "speaker": "ruby", "text": "Mind the bell.", "if": { "helpedRuby": true } }
+  ]
+}
+```
+
+Each line needs `speaker` (a cast id) and `text`. `choices` (2 to 4) each set one or more flags when picked. A line with `if` is skipped unless it matches, checked when the scene reaches it, so a choice can decide the lines after it. Keep intros and outros to eight lines or fewer. Bad data fails at startup naming the file and line.
+
+## Story flags
+
+Flags are named values: `true`, `false`, a number or a string. Dialogue choices set them; levels, dialogue lines and chapter scene variants read them. A condition is an object of flag names to values, and matches when every listed flag equals its value: `{ "helpedRuby": true, "alertness": 2 }`. A flag that was never set reads as `false`, so `{ "gaveNames": false }` also matches before the choice was made. Flags persist in the save and are never cleared by replaying. Use camelCase names and add each new flag to the list below.
+
+Flags in use: none yet. Planned in `docs/story.md`: `taggedVan` (ch3), `helpedRuby` (ch4), `gaveNames` (ch6).
+
 ## Testing
 
 - Manual: walk into a cone (caught after about half a second), stand behind a building inside a cone's range (not caught), reach the finish (time shown).
 - Difficulty and assist: with cleared storage the menu shows Easy selected. A catch takes about 1.5 s on Easy and 0.5 s on Normal. A three-quarter joystick push inside a marching group stays hidden at the group's pace; a full push breaks out.
 - Economy: with cleared storage, collect coins and get caught (Caught screen states the loss, menu balance stays 0); finish a run (balance equals coins plus the stated bonus); buy and equip an item in the locker, start a run (the player wears it); reload (balance, owned and equipped survive).
+- Story: with a v1 save holding coins and an item, reload: coins and item survive and a v2 key appears. The chapter map shows chapter 1 open and 2 to 8 locked. Playing chapter 1 shows the intro; Skip starts the level; finishing plays the outro, then the result; chapter 1 shows Replay and chapter 2 "Coming soon". Replaying still pays coins. A dialogue with a choice stops Skip at the choice, saves the flag, and the flag survives a reload.
 - Balance: `node tools/ride.mjs src/levels/level-01.json` and the other scripts in `tools/` (see `tools/README.md`). Playwright 1.63.0 is a devDependency; on a new machine run `npx playwright install chromium` once.
 - Other automated checks are ad hoc Playwright scripts against the dev server (`http://localhost:5173/Mobile-game/`), using `window.game.scene.getScene('game')` to place the player and freeze an officer. There is no test runner in the project yet.
 
 ## Not built yet
 
-Sound beyond the coin pickup, a level select, more levels, skin tone choice, saving best times, police chasing or alert states beyond the catch meter, a pause or quit button during a run.
+Chapters 2 to 8 (levels, mechanics, dialogue), sound beyond the coin pickup, art for the dialogue portraits, skin tone choice, saving best times, police chasing or alert states beyond the catch meter, a pause or quit button during a run.

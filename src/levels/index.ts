@@ -1,4 +1,5 @@
-import type { LevelData } from './types';
+import { checkFlagMap } from '../story/flags';
+import { MODIFIER_FACTORS, type LevelData } from './types';
 
 // Every JSON file in this folder is a level. They are played in file-name
 // order, so adding "level-02.json" adds a level without code changes.
@@ -41,5 +42,20 @@ function validate(level: LevelData, path: string): LevelData {
     if (c.value !== undefined && !(Number.isInteger(c.value) && c.value > 0)) fail(`coin ${i} "value" must be a positive whole number`);
   });
   if (level.parTimeSec !== undefined && !(level.parTimeSec > 0)) fail('"parTimeSec" must be positive');
+  const lists = { obstacle: level.obstacles, officer: level.officers, crowd: level.crowds, coin: level.coins };
+  for (const [what, list] of Object.entries(lists)) {
+    list.forEach((e, i) => e.if !== undefined && checkFlagMap(e.if, fail, `${what} ${i} "if"`));
+  }
+  level.modifiers ??= [];
+  if (!Array.isArray(level.modifiers)) fail('"modifiers" must be an array');
+  level.modifiers.forEach((m, i) => {
+    if (m.if !== undefined) checkFlagMap(m.if, fail, `modifier ${i} "if"`);
+    for (const key of MODIFIER_FACTORS) {
+      if (m[key] !== undefined && !(typeof m[key] === 'number' && m[key] > 0)) fail(`modifier ${i} "${key}" must be a positive number`);
+    }
+    for (const key of Object.keys(m)) {
+      if (key !== 'if' && !(MODIFIER_FACTORS as readonly string[]).includes(key)) fail(`modifier ${i} has unknown field "${key}"`);
+    }
+  });
   return level;
 }

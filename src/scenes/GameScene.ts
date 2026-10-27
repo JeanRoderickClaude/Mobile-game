@@ -8,10 +8,13 @@ import { Coin } from '../entities/Coin';
 import { Crowd } from '../entities/Crowd';
 import { PoliceOfficer } from '../entities/PoliceOfficer';
 import { LEVELS } from '../levels';
-import type { LevelData, Obstacle, Rect } from '../levels/types';
+import { resolveLevel } from '../levels/resolve';
+import type { Obstacle, Rect, ResolvedLevel } from '../levels/types';
+import type { Flags } from '../story/flags';
+import { CHAPTERS, isPlayable, pickScene } from '../story/story';
 import { finishBonus } from '../systems/economy';
 import { overlaps } from '../systems/geometry';
-import { addCoins, equippedLook, getCoins, getDifficulty } from '../systems/save';
+import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags } from '../systems/save';
 import { playCoin } from '../systems/sfx';
 import { VirtualJoystick } from '../systems/VirtualJoystick';
 import { CoinLabel } from '../ui/widgets';
@@ -21,11 +24,16 @@ export interface GameSceneData {
   levelIndex?: number;
   /** Overrides the saved difficulty (used by the balance tools). */
   difficulty?: Difficulty;
+  /** Set when played as a story chapter: finishing completes it and plays its outro. */
+  chapterIndex?: number;
+  /** Overrides the saved story flags (for testing level variants). */
+  flags?: Flags;
 }
 
 export class GameScene extends Phaser.Scene {
-  private level!: LevelData;
+  private level!: ResolvedLevel;
   private levelIndex = 0;
+  private chapterIndex: number | undefined;
   private player!: Character;
   private officers: PoliceOfficer[] = [];
   private crowds: Crowd[] = [];
@@ -55,9 +63,10 @@ export class GameScene extends Phaser.Scene {
 
   init(data: GameSceneData): void {
     this.levelIndex = data.levelIndex ?? 0;
-    this.level = LEVELS[this.levelIndex];
+    this.chapterIndex = data.chapterIndex;
+    this.level = resolveLevel(LEVELS[this.levelIndex], data.flags ?? getFlags());
     this.difficulty = data.difficulty ?? getDifficulty();
-    this.catchTimeMs = DIFFICULTIES[this.difficulty].catchTimeMs;
+    this.catchTimeMs = DIFFICULTIES[this.difficulty].catchTimeMs * this.level.catchTimeFactor;
     this.assisting = false;
     this.officers = [];
     this.crowds = [];
@@ -106,8 +115,9 @@ export class GameScene extends Phaser.Scene {
       .text(16, 14, '', { fontFamily: 'Arial, sans-serif', fontSize: '26px', color: COLORS.text, stroke: '#000', strokeThickness: 4 })
       .setScrollFactor(0)
       .setDepth(90);
+    const chapter = this.chapterIndex !== undefined ? CHAPTERS[this.chapterIndex] : undefined;
     this.add
-      .text(GAME_WIDTH - 16, 14, this.level.name, { fontFamily: 'Arial, sans-serif', fontSize: '22px', color: COLORS.text, stroke: '#000', strokeThickness: 4 })
+      .text(GAME_WIDTH - 16, 14, chapter ? `${this.chapterIndex! + 1}. ${chapter.title}` : this.level.name, { fontFamily: 'Arial, sans-serif', fontSize: '22px', color: COLORS.text, stroke: '#000', strokeThickness: 4 })
       .setOrigin(1, 0)
       .setScrollFactor(0)
       .setDepth(90);
@@ -285,6 +295,8 @@ export class GameScene extends Phaser.Scene {
     // Coins only count once the route is complete; getting caught loses them all.
     this.bonus = outcome === 'complete' ? finishBonus(this.elapsedMs, this.level) : 0;
     if (outcome === 'complete') addCoins(this.runCoins + this.bonus);
+    const chapter = this.chapterIndex !== undefined ? CHAPTERS[this.chapterIndex] : undefined;
+    if (chapter && outcome === 'complete') completeChapter(chapter.id);
     const data: ResultData = {
       outcome,
       elapsedMs: this.elapsedMs,
@@ -293,8 +305,12 @@ export class GameScene extends Phaser.Scene {
       balance: getCoins(),
       levelIndex: this.levelIndex,
       hasNextLevel: this.levelIndex + 1 < LEVELS.length,
+      chapterIndex: this.chapterIndex,
+      hasNextChapter: this.chapterIndex !== undefined && isPlayable(this.chapterIndex + 1),
     };
-    this.scene.launch('result', data);
+    const outro = chapter && outcome === 'complete' ? pickScene(chapter.outro) : undefined;
+    if (outro) this.scene.launch('dialogue', { dialogueId: outro.id, overlay: true, then: { key: 'result', data, launch: true } });
+    else this.scene.launch('result', data);
   }
 
   private drawStreet(): void {

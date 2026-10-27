@@ -4,7 +4,7 @@ import { Character } from '../entities/Character';
 import { equippedLook, getCoins, getDifficulty, setDifficulty } from '../systems/save';
 import { CoinLabel, FONT, FONT_BOLD, makeButton } from '../ui/widgets';
 
-/** First screen: title, coin balance, the current look, Play, Locker and the difficulty choice. */
+/** First screen: title, coin balance, the current look, Play (the chapter map), Locker and the difficulty choice. */
 export class MenuScene extends Phaser.Scene {
   constructor() {
     super('menu');
@@ -26,7 +26,7 @@ export class MenuScene extends Phaser.Scene {
     const balance = new CoinLabel(this, 0, 600, getCoins(), 36);
     balance.x = cx - balance.labelWidth / 2;
 
-    const play = () => this.scene.start('game', { levelIndex: 0 });
+    const play = () => this.scene.start('chapters');
     makeButton(this, cx, 685, 'Play', play, 280, 70);
     makeButton(this, cx, 770, 'Locker', () => this.scene.start('locker'), 280, 70);
     this.buildDifficultyPicker(cx, 880);

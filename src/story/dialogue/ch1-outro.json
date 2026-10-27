@@ -1,0 +1,11 @@
+{
+  "lines": [
+    { "speaker": "narrator", "text": "Pip reaches the harbor steps, out of breath, trumpet case still swinging." },
+    { "speaker": "pip", "text": "I outran the police. I lose races to buses. Parked buses." },
+    { "speaker": "quill", "text": "Citizens of Port Murmur. Quiet is a public good. Please enjoy it responsibly." },
+    { "speaker": "pip", "text": "She said that through a megaphone." },
+    { "speaker": "stranger", "text": "Nice getaway, kid. Most people in this town run from the music. You ran with it." },
+    { "speaker": "stranger", "text": "If you want to play where the meters can't reach, find the Brass Cellar. Ask for Ruby." },
+    { "speaker": "pip", "text": "The Brass Cellar. Okay. One more song, then." }
+  ]
+}

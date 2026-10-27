@@ -1,0 +1,12 @@
+{
+  "lines": [
+    { "speaker": "narrator", "text": "Port Murmur. Gulls, foghorns, and one shy trumpet on the corner of Main Street." },
+    { "speaker": "gus", "text": "Play the sad one again, Pip. My haddock love the sad one." },
+    { "speaker": "narrator", "text": "A white van parks on the pavement. The Quiet Squad climbs out, decibel meters raised." },
+    { "speaker": "hush", "text": "By order of Mayor Quill and the Silence Act, your trumpet reads eighty-two decibels." },
+    { "speaker": "pip", "text": "That was my quiet song." },
+    { "speaker": "hush", "text": "Velvet Heights has filed a complaint. Lower the instrument. Slowly. Silently." },
+    { "speaker": "gus", "text": "Psst. A march is heading north. Stay in the crowd, out of their sight lines, and grab your tips on the way." },
+    { "speaker": "pip", "text": "Sorry, Sergeant. The song isn't finished." }
+  ]
+}

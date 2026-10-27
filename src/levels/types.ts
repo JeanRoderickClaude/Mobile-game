@@ -1,3 +1,5 @@
+import type { Condition } from '../story/flags';
+
 export interface Point {
   x: number;
   y: number;
@@ -10,13 +12,18 @@ export interface Rect {
   height: number;
 }
 
-export interface Obstacle extends Rect {
+/** Any level entry with "if" is only placed when the story flags match (see src/story/flags.ts). */
+interface Conditional {
+  if?: Condition;
+}
+
+export interface Obstacle extends Rect, Conditional {
   type: 'building' | 'car';
   /** Optional hex colour such as "#c96f53". A palette colour is picked when left out. */
   color?: string;
 }
 
-export interface OfficerData {
+export interface OfficerData extends Conditional {
   /** Waypoints in world units. The officer starts at the first one. */
   patrol: Point[];
   /** "loop" returns from the last point to the first; "pingpong" walks back along the route. */
@@ -29,7 +36,7 @@ export interface OfficerData {
   visionAngle: number;
 }
 
-interface CrowdBase {
+interface CrowdBase extends Conditional {
   /** Number of protestors in the group. */
   size: number;
   /** The player counts as inside the group within this distance of its centre. Default CROWD_RADIUS. */
@@ -58,10 +65,27 @@ export interface StandingCrowdData extends CrowdBase {
 export type CrowdData = MarchingCrowdData | StandingCrowdData;
 
 /** A coin lying on the street. Collected by walking over it. */
-export interface CoinData extends Point {
+export interface CoinData extends Point, Conditional {
   /** Coins added to the run when picked up. Default COIN_VALUE (5). Higher values draw as valuable coins. */
   value?: number;
 }
+
+/**
+ * Tuning applied when the story flags match. Every matching modifier applies;
+ * factors multiply. Left-out factors are 1.
+ */
+export interface LevelModifier extends Conditional {
+  /** Multiplies every crowd's size (rounded, at least 1). */
+  crowdSizeFactor?: number;
+  /** Multiplies every officer's visionRange. */
+  visionRangeFactor?: number;
+  /** Multiplies every officer's walking speed. */
+  officerSpeedFactor?: number;
+  /** Multiplies the difficulty's catch time. Below 1 means more alert police. */
+  catchTimeFactor?: number;
+}
+
+export const MODIFIER_FACTORS = ['crowdSizeFactor', 'visionRangeFactor', 'officerSpeedFactor', 'catchTimeFactor'] as const;
 
 export interface LevelData {
   id: string;
@@ -78,4 +102,12 @@ export interface LevelData {
   coins?: CoinData[];
   /** Optional. Finish time in seconds that earns the full speed bonus. Default: height / PLAYER_SPEED x PAR_TIME_FACTOR. */
   parTimeSec?: number;
+  /** Optional. Story-flag dependent tuning, applied by resolveLevel. */
+  modifiers?: LevelModifier[];
+}
+
+/** A level with its story flags applied: conditional entries removed, modifiers folded in. */
+export interface ResolvedLevel extends LevelData {
+  /** Product of the matching modifiers' catchTimeFactor. */
+  catchTimeFactor: number;
 }
