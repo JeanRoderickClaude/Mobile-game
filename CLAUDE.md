@@ -32,7 +32,7 @@ The live site is the owner's personal test build. When the owner asks for a feat
 - `docs/story.md`: the story outline (setting, characters, the eight chapters, design rules).
 - `src/scenes/MenuScene.ts`: first screen. Title, the equipped look, coin balance, Play (opens the chapter map) and Locker buttons, and an Easy / Normal difficulty switch. Enter or Space opens the chapter map, L opens the locker.
 - `src/scenes/ChapterMapScene.ts`: the eight chapters by title with their state: Replay (done), Play (open), Coming soon (open but no level yet), Locked. Enter plays the furthest open chapter; Escape or Back returns to the menu.
-- `src/scenes/DialogueScene.ts`: story dialogue. Speaker name, placeholder portrait, text, choice buttons. Started standalone (intro, harbor backdrop) or as an overlay on the paused game (outro). Ends by starting or launching the scene it was given.
+- `src/scenes/DialogueScene.ts`: story dialogue. Speaker name with a colon, placeholder portrait, text, choice buttons; narration in italics with no name. The box sits on the bottom edge and grows upward to fit the line. Started standalone (intro, harbor backdrop) or as an overlay on the paused game (outro). Ends by starting or launching the scene it was given.
 - `src/scenes/LockerScene.ts`: the shop. Large character preview, Hats / Outfits / Signs tabs, item grid, Buy / Equip button. Escape or Back returns to the menu.
 - `src/scenes/GameScene.ts`: loads a level with the story flags applied, draws street and obstacles, player input and collision, detection, coins, HUD timer and coin counter, payout at the end. When started with a `chapterIndex` it marks the chapter done on finishing and plays its outro before the result.
 - `src/scenes/ResultScene.ts`: "Caught" / "Route complete" overlay with the coin breakdown. In a chapter: Try again / Replay (skips the intro), "Next chapter" when the next one has a level, and Chapters. Outside a chapter (balance tools): Restart, "Next level" and Menu. Enter, Space or R restart; Escape leaves.
@@ -69,7 +69,7 @@ The live site is the owner's personal test build. When the owner asks for a feat
 - Officers walk their waypoints at `speed`, wait `pauseMs` at each one, and turn smoothly toward the next leg (also while waiting). `loop` routes return to the first point; `pingpong` routes walk back.
 - Levels are data. Every `src/levels/*.json` file is picked up by `import.meta.glob`. Players reach a level through the chapter that names it in `chapters.json`. The balance tools still start levels by file-name index. Bad data fails at startup with an error naming the file.
 - Story flow: Play → chapter map → chapter intro (if any) → level → on finishing, the chapter is saved as done, then the outro plays over the paused level, then the result screen. Getting caught shows the result screen with no outro. Chapter 1 is always open; each later chapter opens when the one before it is done. Finished chapters replay with full coin payout and play their intro and outro again (Skip ends them). A chapter with no `level` shows "Coming soon" once open.
-- Dialogue: tap or Space/Enter advances; Skip or Escape jumps to the next choice ahead, or ends the scene when none is left, so choices cannot be skipped past. While a choice is showing, Skip and tap-to-advance are off; tap a button or press 1-4. Input is ignored for the first 300 ms so a lifted finger or held key from the level does not skip a line. Replaying a chapter and picking differently overwrites the flag.
+- Dialogue: text is 26px at every length and wraps across the full box width (about 34 characters per row). A long line makes the box taller, never the text smaller; the box stops below the Skip button, and in dev a line too long even for that logs a console warning. Tap or Space/Enter advances; Skip or Escape jumps to the next choice ahead, or ends the scene when none is left, so choices cannot be skipped past. While a choice is showing, Skip and tap-to-advance are off; tap a button or press 1-4. Input is ignored for the first 300 ms so a lifted finger or held key from the level does not skip a line. Replaying a chapter and picking differently overwrites the flag.
 - Crowds: defined per level. Marching groups walk their `path` at `speed` (default 60 percent of `PLAYER_SPEED`, 102) in a loose two-wide column that turns with the path, fade out at the end, and a new group starts at the first point `intervalMs` later. Standing groups shuffle in place at `x, y`. Protestors block nothing: not movement, not line of sight. A faint disc shows each group's `radius` (default `CROWD_RADIUS`, 75).
 - Hiding: the player is hidden while within a group's radius and moving no faster than `HIDE_SPEED_MARGIN` (1.1) times the group's speed, with a floor of `HIDE_SPEED_FLOOR` (25 units/s) so standing groups (speed 0) allow a slow shuffle. Player speed is measured after collision, so pushing into a wall counts as standing. A three-heads icon shows above the player while hidden.
 - The player wears a magenta vest (`vest-magenta`, kept out of the crowd pools) and a white marker ring, so they stay visible in a crowd.
@@ -180,7 +180,7 @@ Chapters (`src/story/chapters.json`), in play order:
 "outro": [{ "scene": "ch8-end-full", "if": { "helpedRuby": true, "gaveNames": false } }, { "scene": "ch8-end-small" }]
 ```
 
-Cast (`src/story/cast.json`), keyed by speaker id: `{ "pip": { "name": "Pip", "color": "#ff3fa4", "shape": "circle" } }`. Shapes: `circle`, `square`, `diamond`, `triangle`, `hexagon`, or `none` (narrator: no portrait, no name, italic text across the panel).
+Cast (`src/story/cast.json`), keyed by speaker id: `{ "pip": { "name": "Pip", "color": "#ff3fa4", "shape": "circle" } }`. Shapes: `circle`, `square`, `diamond`, `triangle`, `hexagon`. The name is shown as "Pip:".
 
 Dialogue (`src/story/dialogue/<id>.json`):
 
@@ -191,12 +191,13 @@ Dialogue (`src/story/dialogue/<id>.json`):
       { "text": "Carry the tuba", "set": { "helpedRuby": true } },
       { "text": "Run", "set": { "helpedRuby": false } }
     ] },
-    { "speaker": "ruby", "text": "Mind the bell.", "if": { "helpedRuby": true } }
+    { "speaker": "ruby", "text": "Mind the bell.", "if": { "helpedRuby": true } },
+    { "text": "Behind them, the Cellar door slams shut." }
   ]
 }
 ```
 
-Each line needs `speaker` (a cast id) and `text`. `choices` (2 to 4) each set one or more flags when picked. A line with `if` is skipped unless it matches, checked when the scene reaches it, so a choice can decide the lines after it. Keep intros and outros to eight lines or fewer. Bad data fails at startup naming the file and line.
+Each line needs `text`. `speaker` is a cast id; leave it out for narration (italic, no name or portrait). `choices` (2 to 4) each set one or more flags when picked. A line with `if` is skipped unless it matches, checked when the scene reaches it, so a choice can decide the lines after it. Write dialogue by the style guide in `docs/story.md` (12 to 16 lines per scene, one to three sentences per line, Pip's thoughts in brackets). Bad data fails at startup naming the file and line.
 
 ## Story flags
 
@@ -209,7 +210,7 @@ Flags in use: none yet. Planned in `docs/story.md`: `taggedVan` (ch3), `helpedRu
 - Manual: walk into a cone (caught after about half a second), stand behind a building inside a cone's range (not caught), reach the finish (time shown).
 - Difficulty and assist: with cleared storage the menu shows Easy selected. A catch takes about 1.5 s on Easy and 0.5 s on Normal. A three-quarter joystick push inside a marching group stays hidden at the group's pace; a full push breaks out.
 - Economy: with cleared storage, collect coins and get caught (Caught screen states the loss, menu balance stays 0); finish a run (balance equals coins plus the stated bonus); buy and equip an item in the locker, start a run (the player wears it); reload (balance, owned and equipped survive).
-- Story: with a v1 save holding coins and an item, reload: coins and item survive and a v2 key appears. The chapter map shows chapter 1 open and 2 to 8 locked. Playing chapter 1 shows the intro; Skip starts the level; finishing plays the outro, then the result; chapter 1 shows Replay and chapter 2 "Coming soon". Replaying still pays coins. A dialogue with a choice stops Skip at the choice, saves the flag, and the flag survives a reload.
+- Story: with a v1 save holding coins and an item, reload: coins and item survive and a v2 key appears. The chapter map shows chapter 1 open and 2 to 8 locked. Playing chapter 1 shows the intro; Skip starts the level; finishing plays the outro, then the result; chapter 1 shows Replay and chapter 2 "Coming soon". Replaying still pays coins. A dialogue with a choice stops Skip at the choice, saves the flag, and the flag survives a reload. In an emulated phone (Playwright `devices['iPhone 13']`), read every line: speaker names end with a colon, narration is italic with no name or portrait, and text stays inside the box above "Tap to continue".
 - Balance: `node tools/ride.mjs src/levels/level-01.json` and the other scripts in `tools/` (see `tools/README.md`). Playwright 1.63.0 is a devDependency; on a new machine run `npx playwright install chromium` once.
 - Other automated checks are ad hoc Playwright scripts against the dev server (`http://localhost:5173/Mobile-game/`), using `window.game.scene.getScene('game')` to place the player and freeze an officer. There is no test runner in the project yet.
 

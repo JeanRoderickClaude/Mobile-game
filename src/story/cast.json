@@ -1,9 +1,9 @@
 {
-  "narrator": { "name": "", "color": "#b5b7c0", "shape": "none" },
-  "pip": { "name": "Pip", "color": "#ff3fa4", "shape": "circle" },
-  "gus": { "name": "Gus", "color": "#5ca9e6", "shape": "square" },
-  "hush": { "name": "Sgt. Hush", "color": "#24407a", "shape": "diamond" },
-  "quill": { "name": "Mayor Quill", "color": "#8e6bbf", "shape": "hexagon" },
-  "stranger": { "name": "Stranger", "color": "#c0392b", "shape": "triangle" },
-  "ruby": { "name": "Ma Ruby", "color": "#c0392b", "shape": "triangle" }
+  "pip": {"name": "Pip", "color": "#ff3fa4", "shape": "circle"},
+  "gus": {"name": "Gus", "color": "#5ca9e6", "shape": "square"},
+  "hush": {"name": "Sgt. Hush", "color": "#24407a", "shape": "diamond"},
+  "mute": {"name": "Officer Mute", "color": "#4a6fb0", "shape": "diamond"},
+  "quill": {"name": "Mayor Quill", "color": "#8e6bbf", "shape": "hexagon"},
+  "stranger": {"name": "Stranger", "color": "#c0392b", "shape": "triangle"},
+  "ruby": {"name": "Ma Ruby", "color": "#c0392b", "shape": "triangle"}
 }

@@ -1,12 +1,20 @@
 {
   "lines": [
-    { "speaker": "narrator", "text": "Port Murmur. Gulls, foghorns, and one shy trumpet on the corner of Main Street." },
-    { "speaker": "gus", "text": "Play the sad one again, Pip. My haddock love the sad one." },
-    { "speaker": "narrator", "text": "A white van parks on the pavement. The Quiet Squad climbs out, decibel meters raised." },
-    { "speaker": "hush", "text": "By order of Mayor Quill and the Silence Act, your trumpet reads eighty-two decibels." },
-    { "speaker": "pip", "text": "That was my quiet song." },
-    { "speaker": "hush", "text": "Velvet Heights has filed a complaint. Lower the instrument. Slowly. Silently." },
-    { "speaker": "gus", "text": "Psst. A march is heading north. Stay in the crowd, out of their sight lines, and grab your tips on the way." },
-    { "speaker": "pip", "text": "Sorry, Sergeant. The song isn't finished." }
+    { "text": "Port Murmur, nine in the morning. Usually the gulls, the foghorns and the fish sellers make this the loudest harbor on the coast." },
+    { "text": "Not today. At midnight the Silence Act took effect, and any street sound over sixty decibels now carries a fine." },
+    { "speaker": "pip", "text": "(Okay. Nobody's here. One song before the Act notices me.)" },
+    { "speaker": "gus", "text": "Pip, you're playing today? Quick, then, the sad one. My haddock love the sad one." },
+    { "speaker": "pip", "text": "Um, hi, Gus. Just a quiet one. I put a sock in it." },
+    { "speaker": "pip", "text": "(There is no sock. There has never been a sock.)" },
+    { "text": "Pip plays the sad one. Three people stop, then ten, and a toddler starts dancing very badly. For a moment, it is a good morning." },
+    { "text": "A white van mounts the pavement. Three officers in grey step out, decibel meters raised like holy relics." },
+    { "speaker": "hush", "text": "Quiet Squad! Nobody move, nobody hum. Officer Mute, a reading, please." },
+    { "speaker": "mute", "text": "Eighty-two decibels, Sergeant. Peaking at eighty-four on the high bit. Velvet Heights will be devastated." },
+    { "speaker": "hush", "text": "Eighty-four. In a residential zone. Before lunch." },
+    { "speaker": "hush", "text": "Citizen, under Section 4, Subsection Shh, you are making a sound." },
+    { "speaker": "pip", "text": "I, um. It's a trumpet. That's sort of its whole job." },
+    { "speaker": "hush", "text": "Then its job is now illegal. Lower the instrument slowly and surrender it for decibel-safe storage." },
+    { "speaker": "gus", "text": "Pip. The march is heading north up Main Street. Get in the middle, stay out of their sight lines, and pick up your tips on the way." },
+    { "speaker": "pip", "text": "(Surrender it? It was Grandad's. Okay, feet, please do something brave.)" }
   ]
 }

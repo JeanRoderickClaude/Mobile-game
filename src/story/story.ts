@@ -8,14 +8,14 @@ import { checkFlagMap, matches, type Condition, type FlagValue } from './flags';
 // Chapters, cast and dialogue scenes. All of it is data, checked once at
 // startup; bad data throws an error naming the file and entry.
 
-export type PortraitShape = 'none' | 'circle' | 'square' | 'diamond' | 'triangle' | 'hexagon';
-const SHAPES: PortraitShape[] = ['none', 'circle', 'square', 'diamond', 'triangle', 'hexagon'];
+export type PortraitShape = 'circle' | 'square' | 'diamond' | 'triangle' | 'hexagon';
+const SHAPES: PortraitShape[] = ['circle', 'square', 'diamond', 'triangle', 'hexagon'];
 
 export interface CastMember {
-  /** Shown above the text. Empty for the narrator. */
+  /** Shown next to the portrait, followed by a colon. */
   name: string;
   color: string;
-  /** Placeholder portrait. "none" hides the portrait. */
+  /** Placeholder portrait. */
   shape: PortraitShape;
 }
 
@@ -26,8 +26,8 @@ export interface Choice {
 }
 
 export interface DialogueLine {
-  /** Key into cast.json. */
-  speaker: string;
+  /** Key into cast.json. Left out for narration: no name or portrait, italic text. */
+  speaker?: string;
   text: string;
   /** Optional. The line is skipped unless the story flags match. */
   if?: Condition;
@@ -71,7 +71,7 @@ function validateDialogue(d: Dialogue, path: string): Dialogue {
   };
   if (!Array.isArray(d.lines) || d.lines.length === 0) fail('needs a non-empty "lines" array');
   d.lines.forEach((line, i) => {
-    if (!Object.hasOwn(CAST, line.speaker)) fail(`line ${i} speaker "${line.speaker}" is not in src/story/cast.json`);
+    if (line.speaker !== undefined && !Object.hasOwn(CAST, line.speaker)) fail(`line ${i} speaker "${line.speaker}" is not in src/story/cast.json`);
     if (typeof line.text !== 'string' || !line.text) fail(`line ${i} needs "text"`);
     if (line.if !== undefined) checkFlagMap(line.if, fail, `line ${i} "if"`);
     if (line.choices !== undefined) {
@@ -91,6 +91,7 @@ function validateChapters(chapters: Chapter[]): Chapter[] {
   };
   for (const [key, c] of Object.entries(CAST)) {
     if (!SHAPES.includes(c.shape)) throw new Error(`src/story/cast.json: "${key}" shape must be one of ${SHAPES.join(', ')}`);
+    if (!c.name) throw new Error(`src/story/cast.json: "${key}" needs a "name"`);
     if (!/^#[0-9a-f]{6}$/i.test(c.color)) throw new Error(`src/story/cast.json: "${key}" color must be #rrggbb`);
   }
   const ids = new Set<string>();

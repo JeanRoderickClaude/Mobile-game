@@ -24,14 +24,24 @@ export interface DialogueSceneData {
 // a key held from the previous scene does not skip the first line.
 const INPUT_DELAY_MS = 300;
 
-const PANEL_TOP = 600;
-const PORTRAIT_X = 95;
-const PORTRAIT_Y = 690;
-const TEXT_X = 175;
+// The panel sits on the bottom edge and grows upward to fit the line, so
+// text keeps one size however long it is. Text spans the full panel width
+// under the portrait row: about 34 characters per row at 26px.
+const PANEL_X = 12;
+const PANEL_W = GAME_WIDTH - 24;
+const PANEL_BOTTOM = 948;
+const PANEL_MIN_H = 300; // speech: portrait row plus three rows of text
+const NARRATION_MIN_H = 200; // narration has no portrait row
+const PANEL_MAX_TOP = 96; // never cover the Skip button
+const PAD = 24;
+const PORTRAIT = 84; // portrait box size
+const TEXT_W = PANEL_W - PAD * 2;
+const HINT_H = 40; // room under the text for "Tap to continue"
+const HORIZON = 600; // bottom of the harbor backdrop
 
 /**
  * Story dialogue: one line at a time with the speaker's name and a
- * placeholder portrait. Tap or Space advances. Skip ends the scene, but stops
+ * placeholder portrait, or italic narration with neither. Tap or Space advances. Skip ends the scene, but stops
  * at any choice still ahead so story flags are always set.
  */
 export class DialogueScene extends Phaser.Scene {
@@ -40,6 +50,7 @@ export class DialogueScene extends Phaser.Scene {
   private then!: NextScene;
   private openedAt = 0;
   private pressed = false; // a pointer went down inside this scene
+  private panel!: Phaser.GameObjects.Graphics;
   private portrait!: Phaser.GameObjects.Graphics;
   private nameText!: Phaser.GameObjects.Text;
   private bodyText!: Phaser.GameObjects.Text;
@@ -70,13 +81,13 @@ export class DialogueScene extends Phaser.Scene {
     bg.on('pointerup', () => this.pressed && this.advance());
     if (!data.overlay) this.drawHarbor();
 
-    this.add.rectangle(cx, PANEL_TOP + 170, GAME_WIDTH - 24, 340, 0x10121a, 0.94).setStrokeStyle(3, 0xffffff, 0.5);
+    this.panel = this.add.graphics();
     this.portrait = this.add.graphics();
-    this.nameText = this.add.text(TEXT_X, PANEL_TOP + 28, '', { fontFamily: FONT_BOLD, fontSize: '26px', color: '#ffffff' });
-    this.bodyText = this.add.text(TEXT_X, PANEL_TOP + 72, '', {
-      fontFamily: FONT, fontSize: '25px', color: '#ffffff', lineSpacing: 6, wordWrap: { width: GAME_WIDTH - TEXT_X - 34 },
+    this.nameText = this.add.text(0, 0, '', { fontFamily: FONT_BOLD, fontSize: '26px', color: '#ffffff' }).setOrigin(0, 0.5);
+    this.bodyText = this.add.text(PANEL_X + PAD, 0, '', {
+      fontFamily: FONT, fontSize: '26px', color: '#ffffff', lineSpacing: 8, wordWrap: { width: TEXT_W, useAdvancedWrap: true },
     });
-    this.hint = this.add.text(GAME_WIDTH - 30, PANEL_TOP + 318, 'Tap to continue', { fontFamily: FONT, fontSize: '18px', color: '#b5b7c0' }).setOrigin(1, 0.5);
+    this.hint = this.add.text(PANEL_X + PANEL_W - PAD, PANEL_BOTTOM - HINT_H / 2 - 4, 'Tap to continue', { fontFamily: FONT, fontSize: '18px', color: '#b5b7c0' }).setOrigin(1, 0.5);
     this.skip = makeButton(this, GAME_WIDTH - 80, 45, 'Skip', () => this.skipAhead(), 120, 50);
 
     const kb = this.input.keyboard!;
@@ -138,18 +149,18 @@ export class DialogueScene extends Phaser.Scene {
       this.finish();
       return;
     }
-    const who = CAST[line.speaker];
-    this.drawPortrait(who);
-    this.nameText.setText(who.name);
-    const narrated = who.shape === 'none';
-    // The narrator has no portrait, so its text uses the full panel width.
-    const x = narrated ? 40 : TEXT_X;
-    this.bodyText
-      .setX(x)
-      .setY(narrated ? PANEL_TOP + 40 : PANEL_TOP + 72)
-      .setWordWrapWidth(GAME_WIDTH - x - 34)
-      .setFontStyle(narrated ? 'italic' : '')
-      .setText(line.text);
+    // Narration has no speaker: no portrait or name, italic text from the top of the panel.
+    const who = line.speaker !== undefined ? CAST[line.speaker] : undefined;
+    this.bodyText.setFontStyle(who ? '' : 'italic').setText(line.text);
+    const textOffset = who ? PAD + PORTRAIT + 14 : PAD + 4;
+    const wanted = textOffset + this.bodyText.height + 12 + HINT_H;
+    const top = Math.max(PANEL_MAX_TOP, PANEL_BOTTOM - Math.max(who ? PANEL_MIN_H : NARRATION_MIN_H, wanted));
+    if (import.meta.env.DEV && PANEL_BOTTOM - top < wanted) console.warn(`Dialogue line ${this.index} is too long for the screen: ${line.text}`);
+    this.panel.clear().fillStyle(0x10121a, 0.94).fillRect(PANEL_X, top, PANEL_W, PANEL_BOTTOM - top);
+    this.panel.lineStyle(3, 0xffffff, 0.5).strokeRect(PANEL_X, top, PANEL_W, PANEL_BOTTOM - top);
+    this.bodyText.setY(top + textOffset);
+    this.drawPortrait(who, top);
+    this.nameText.setText(who ? `${who.name}:` : '').setPosition(PANEL_X + PAD + PORTRAIT + 18, top + PAD + PORTRAIT / 2);
 
     const choices = line.choices ?? [];
     this.hint.setVisible(choices.length === 0);
@@ -157,7 +168,7 @@ export class DialogueScene extends Phaser.Scene {
     this.skip.label.setVisible(choices.length === 0);
     // Choices stack upward from just above the panel.
     choices.forEach((c, i) => {
-      const y = PANEL_TOP - 50 - (choices.length - 1 - i) * 76;
+      const y = top - 50 - (choices.length - 1 - i) * 76;
       this.choiceButtons.push(makeButton(this, GAME_WIDTH / 2, y, `${i + 1}. ${c.text}`, () => this.choose(i), GAME_WIDTH - 60, 64));
     });
     for (const b of this.choiceButtons) b.label.setFontSize(22);
@@ -173,27 +184,28 @@ export class DialogueScene extends Phaser.Scene {
     }
   }
 
-  private drawPortrait(who: CastMember): void {
+  private drawPortrait(who: CastMember | undefined, top: number): void {
     const g = this.portrait.clear();
-    if (who.shape === 'none') return;
-    const color = Phaser.Display.Color.HexStringToColor(who.color).color;
-    g.fillStyle(0x000000, 0.35).fillRoundedRect(PORTRAIT_X - 62, PORTRAIT_Y - 62, 124, 124, 12);
-    g.fillStyle(color, 1).lineStyle(4, 0xffffff, 0.85);
-    drawShape(g, who.shape, PORTRAIT_X, PORTRAIT_Y, 48);
+    if (!who) return;
+    const x = PANEL_X + PAD;
+    const y = top + PAD;
+    g.fillStyle(0x000000, 0.35).fillRoundedRect(x, y, PORTRAIT, PORTRAIT, 10);
+    g.fillStyle(Phaser.Display.Color.HexStringToColor(who.color).color, 1).lineStyle(3, 0xffffff, 0.85);
+    drawShape(g, who.shape, x + PORTRAIT / 2, y + PORTRAIT / 2, PORTRAIT * 0.36);
   }
 
   /** A simple skyline and water line behind standalone scenes. */
   private drawHarbor(): void {
     const g = this.add.graphics();
-    g.fillStyle(0x2a3550, 1).fillRect(0, 0, GAME_WIDTH, PANEL_TOP);
+    g.fillStyle(0x2a3550, 1).fillRect(0, 0, GAME_WIDTH, HORIZON);
     const roofs = [[0, 330, 90], [90, 260, 70], [160, 370, 110], [270, 300, 80], [350, 230, 95], [445, 340, 95]];
     g.fillStyle(0x1d2438, 1);
-    for (const [x, top, w] of roofs) g.fillRect(x, top, w, PANEL_TOP - top);
+    for (const [x, top, w] of roofs) g.fillRect(x, top, w, HORIZON - top);
     g.fillStyle(0xf2c94c, 0.5);
     for (const [x, top, w] of roofs) {
-      for (let wy = top + 25; wy < PANEL_TOP - 60; wy += 45) g.fillRect(x + w / 2 - 8, wy, 16, 20);
+      for (let wy = top + 25; wy < HORIZON - 60; wy += 45) g.fillRect(x + w / 2 - 8, wy, 16, 20);
     }
-    g.fillStyle(0x23476b, 1).fillRect(0, PANEL_TOP - 50, GAME_WIDTH, 50);
+    g.fillStyle(0x23476b, 1).fillRect(0, HORIZON - 50, GAME_WIDTH, GAME_HEIGHT - HORIZON + 50);
   }
 }
 
@@ -221,8 +233,6 @@ function drawShape(g: Phaser.GameObjects.Graphics, shape: PortraitShape, x: numb
       break;
     case 'hexagon':
       poly(6, 0);
-      break;
-    case 'none':
       break;
   }
 }
