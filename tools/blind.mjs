@@ -22,7 +22,7 @@ await run(args._[0], async (page) => {
           s.joystick.vector.set((dx / d) * speed, (dy / d) * speed);
           s.update(0, 16);
         }
-        n++; if (s.finished && s.suspicion < 500) ok++;
+        n++; if (s.finished && s.suspicion < s.catchTimeMs) ok++;
       }
       out.push(`route of crowd ${ri}, alone at ${speed * 100}% speed: ${ok} of ${n} start times survived`);
     }

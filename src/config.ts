@@ -10,8 +10,23 @@ export const CHARACTER_SCALE = 1.25;
 export const PLAYER_SPEED = 170; // units per second
 export const PLAYER_RADIUS = 13 * CHARACTER_SCALE; // collision half-size of the player box
 
-// How long the player must stay in sight before being caught.
-export const CATCH_TIME_MS = 500;
+// Difficulty settings. Everything that differs between difficulties lives
+// here, one object each, so they can be tuned side by side.
+export interface DifficultyConfig {
+  label: string;
+  /** How long the player must stay in sight before being caught. */
+  catchTimeMs: number;
+  /** Multiplies every officer's visionRange (cone length). */
+  visionRangeFactor: number;
+}
+
+export const DIFFICULTIES = {
+  easy: { label: 'Easy', catchTimeMs: 1500, visionRangeFactor: 0.8 },
+  normal: { label: 'Normal', catchTimeMs: 500, visionRangeFactor: 1 },
+} satisfies Record<string, DifficultyConfig>;
+
+export type Difficulty = keyof typeof DIFFICULTIES;
+export const DEFAULT_DIFFICULTY: Difficulty = 'easy';
 // When out of sight, the suspicion meter drains at this multiple of the fill rate.
 export const SUSPICION_DECAY = 2;
 
@@ -27,6 +42,16 @@ export const HIDDEN_DETECTION_RATE = 0.25;
 export const HIDE_SPEED_MARGIN = 1.1;
 // ...or no faster than this, so standing groups (speed 0) allow a slow shuffle.
 export const HIDE_SPEED_FLOOR = 25;
+// Crowd pace assist: inside a marching group with input within this angle of
+// the group's heading, speed is capped at the group's pace times
+// ASSIST_PACE_FACTOR (under HIDE_SPEED_MARGIN, so the player can slowly catch
+// up while staying hidden). In a standing group the cap is HIDE_SPEED_FLOOR
+// times ASSIST_FLOOR_FACTOR. A joystick pushed to ASSIST_BREAK_STRENGTH or
+// more, or the sprint key (Space), skips the cap.
+export const ASSIST_ANGLE_DEG = 60;
+export const ASSIST_PACE_FACTOR = 1.05;
+export const ASSIST_FLOOR_FACTOR = 0.95;
+export const ASSIST_BREAK_STRENGTH = 0.95;
 
 // Coins and the finish bonus.
 export const COIN_VALUE = 5; // value of a coin whose level entry has no "value"

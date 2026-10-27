@@ -93,6 +93,15 @@ export class Crowd {
     return this.data.type === 'marching' && this.active ? this.pathSpeed : 0;
   }
 
+  /** Unit vector of the walking direction (marching groups). */
+  get headingX(): number {
+    return this.dirX;
+  }
+
+  get headingY(): number {
+    return this.dirY;
+  }
+
   contains(px: number, py: number): boolean {
     return this.active && Math.hypot(px - this.x, py - this.y) <= this.radius;
   }

@@ -2,7 +2,7 @@
 // any extra --try points), reports whether riding a marching group picks it
 // up, how much of the time some officer can see the spot, and how often a
 // solo dash to it gets caught.
-// Usage: node tools/coins.mjs src/levels/level-01.json [--seconds 60] [--every 1500] [--try "60,650;480,1350"]
+// Usage: node tools/coins.mjs src/levels/level-01.json [--seconds 60] [--every 1500] [--try "60,650;480,1350"] [--difficulty easy]
 import { parseArgs, run } from './lib.mjs';
 
 const args = parseArgs();
@@ -49,8 +49,8 @@ await run(args._[0], async (page) => {
           meter = seen(k0 + j, x, y) ? meter + STEP : Math.max(0, meter - 2 * STEP);
           peak = Math.max(peak, meter);
         }
-        if (peak >= 500) caught++;
-        peakSum += Math.min(peak, 500);
+        if (peak >= s.catchTimeMs) caught++;
+        peakSum += Math.min(peak, s.catchTimeMs);
       }
       return {
         ...c, onRoute: near.d <= PICKUP ? near.crowd : null, off: Math.round(near.d), blocked,

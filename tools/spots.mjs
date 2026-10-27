@@ -20,7 +20,7 @@ await run(args._[0], async (page) => {
         q.pa = Math.max(q.pa, q.alone); q.pg = Math.max(q.pg, q.group);
       }
     }
-    return pts.filter((q) => q.pa >= 500 && q.pg < maxPeak).map((q) => `${q.x},${q.y}: caught alone, peak ${Math.round(q.pg)}ms in a group`);
+    return pts.filter((q) => q.pa >= s.catchTimeMs && q.pg < maxPeak).map((q) => `${q.x},${q.y}: caught alone, peak ${Math.round(q.pg)}ms in a group`);
   }, [args.grid ?? 30, args.seconds ?? 90, args['max-peak'] ?? 300]);
   console.log(rows.length ? rows.join('\n') : 'No spot is deadly alone and safe in a group.');
 });

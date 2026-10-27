@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
-import { COLORS, GAME_WIDTH } from '../config';
+import { COLORS, DIFFICULTIES, GAME_WIDTH, type Difficulty } from '../config';
 import { Character } from '../entities/Character';
-import { equippedLook, getCoins } from '../systems/save';
+import { equippedLook, getCoins, getDifficulty, setDifficulty } from '../systems/save';
 import { CoinLabel, FONT, FONT_BOLD, makeButton } from '../ui/widgets';
 
-/** First screen: title, coin balance, the current look, Play and Locker. */
+/** First screen: title, coin balance, the current look, Play, Locker and the difficulty choice. */
 export class MenuScene extends Phaser.Scene {
   constructor() {
     super('menu');
@@ -19,20 +19,46 @@ export class MenuScene extends Phaser.Scene {
     this.add.text(cx, 280, 'Reach the finish. Avoid the police.', { fontFamily: FONT, fontSize: '22px', color: '#b5b7c0' }).setOrigin(0.5);
 
     // The player as they will look in a run.
-    this.add.circle(cx, 470, 105, 0xffffff, 0.06);
-    const preview = new Character(this, cx, 480, equippedLook()).setScale(3.4);
-    this.tweens.add({ targets: preview, y: 470, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.add.circle(cx, 445, 100, 0xffffff, 0.06);
+    const preview = new Character(this, cx, 455, equippedLook()).setScale(3.4);
+    this.tweens.add({ targets: preview, y: 445, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
-    const balance = new CoinLabel(this, 0, 640, getCoins(), 36);
+    const balance = new CoinLabel(this, 0, 600, getCoins(), 36);
     balance.x = cx - balance.labelWidth / 2;
 
     const play = () => this.scene.start('game', { levelIndex: 0 });
-    makeButton(this, cx, 740, 'Play', play, 280, 70);
-    makeButton(this, cx, 830, 'Locker', () => this.scene.start('locker'), 280, 70);
+    makeButton(this, cx, 685, 'Play', play, 280, 70);
+    makeButton(this, cx, 770, 'Locker', () => this.scene.start('locker'), 280, 70);
+    this.buildDifficultyPicker(cx, 880);
 
     const kb = this.input.keyboard!;
     kb.once('keydown-ENTER', play);
     kb.once('keydown-SPACE', play);
     kb.once('keydown-L', () => this.scene.start('locker'));
+  }
+
+  /** Segmented Easy / Normal switch. The choice is saved at once. */
+  private buildDifficultyPicker(cx: number, y: number): void {
+    this.add.text(cx, y - 46, 'Difficulty', { fontFamily: FONT, fontSize: '20px', color: '#b5b7c0' }).setOrigin(0.5);
+    const keys = Object.keys(DIFFICULTIES) as Difficulty[];
+    const width = 140;
+    const parts = keys.map((key, i) => {
+      const x = cx + (i - (keys.length - 1) / 2) * width;
+      const bg = this.add.rectangle(x, y, width - 6, 52, 0x34374a).setStrokeStyle(2, 0xffffff, 0.3).setInteractive({ useHandCursor: true });
+      const label = this.add.text(x, y, DIFFICULTIES[key].label, { fontFamily: FONT_BOLD, fontSize: '22px', color: '#ffffff' }).setOrigin(0.5);
+      bg.on('pointerup', () => {
+        setDifficulty(key);
+        refresh();
+      });
+      return { key, bg, label };
+    });
+    const refresh = () => {
+      for (const p of parts) {
+        const on = p.key === getDifficulty();
+        p.bg.setFillStyle(on ? 0xf2c94c : 0x34374a);
+        p.label.setColor(on ? '#1d1f2b' : '#ffffff');
+      }
+    };
+    refresh();
   }
 }

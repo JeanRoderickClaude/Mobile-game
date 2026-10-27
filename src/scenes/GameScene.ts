@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  CATCH_TIME_MS, CHARACTER_SCALE, COIN_PICKUP_RADIUS, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
+  ASSIST_ANGLE_DEG, ASSIST_BREAK_STRENGTH, ASSIST_FLOOR_FACTOR, ASSIST_PACE_FACTOR, CHARACTER_SCALE, COIN_PICKUP_RADIUS, DIFFICULTIES, type Difficulty, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
   PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR,
 } from '../config';
 import { Character } from '../entities/Character';
@@ -11,7 +11,7 @@ import { LEVELS } from '../levels';
 import type { LevelData, Obstacle, Rect } from '../levels/types';
 import { finishBonus } from '../systems/economy';
 import { overlaps } from '../systems/geometry';
-import { addCoins, equippedLook, getCoins } from '../systems/save';
+import { addCoins, equippedLook, getCoins, getDifficulty } from '../systems/save';
 import { playCoin } from '../systems/sfx';
 import { VirtualJoystick } from '../systems/VirtualJoystick';
 import { CoinLabel } from '../ui/widgets';
@@ -19,6 +19,8 @@ import type { ResultData } from './ResultScene';
 
 export interface GameSceneData {
   levelIndex?: number;
+  /** Overrides the saved difficulty (used by the balance tools). */
+  difficulty?: Difficulty;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -33,8 +35,12 @@ export class GameScene extends Phaser.Scene {
   private coinLabel!: CoinLabel;
   private blockers: Rect[] = [];
   private joystick!: VirtualJoystick;
-  private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift', Phaser.Input.Keyboard.Key>;
-  private suspicion = 0; // ms of accumulated sight, caught at CATCH_TIME_MS
+  private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift' | 'sprint', Phaser.Input.Keyboard.Key>;
+  private difficulty: Difficulty = 'normal';
+  private catchTimeMs = 500;
+  private suspicion = 0; // ms of accumulated sight, caught at catchTimeMs
+  private assisting = false; // crowd pace assist is holding the player back this frame
+  private assistHint!: Phaser.GameObjects.Text;
   private elapsedMs = 0;
   private finished = false;
   private timerText!: Phaser.GameObjects.Text;
@@ -50,6 +56,9 @@ export class GameScene extends Phaser.Scene {
   init(data: GameSceneData): void {
     this.levelIndex = data.levelIndex ?? 0;
     this.level = LEVELS[this.levelIndex];
+    this.difficulty = data.difficulty ?? getDifficulty();
+    this.catchTimeMs = DIFFICULTIES[this.difficulty].catchTimeMs;
+    this.assisting = false;
     this.officers = [];
     this.crowds = [];
     this.coins = [];
@@ -73,7 +82,8 @@ export class GameScene extends Phaser.Scene {
     this.drawStreet();
     this.level.obstacles.forEach((o, i) => this.drawObstacle(o, i));
 
-    this.officers = this.level.officers.map((d) => new PoliceOfficer(this, d));
+    const rangeFactor = DIFFICULTIES[this.difficulty].visionRangeFactor;
+    this.officers = this.level.officers.map((d) => new PoliceOfficer(this, { ...d, visionRange: d.visionRange * rangeFactor }));
 
     this.crowds = (this.level.crowds ?? []).map((d) => new Crowd(this, d));
 
@@ -88,7 +98,7 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard!;
     const K = Phaser.Input.Keyboard.KeyCodes;
     this.keys = kb.addKeys({
-      up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D, shift: K.SHIFT,
+      up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D, shift: K.SHIFT, sprint: K.SPACE,
     }) as typeof this.keys;
     this.joystick = new VirtualJoystick(this);
 
@@ -101,7 +111,18 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setScrollFactor(0)
       .setDepth(90);
+    this.add
+      .text(GAME_WIDTH - 16, 44, DIFFICULTIES[this.difficulty].label, { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#d0d2da', stroke: '#000', strokeThickness: 3 })
+      .setOrigin(1, 0)
+      .setScrollFactor(0)
+      .setDepth(90);
     this.coinLabel = new CoinLabel(this, 16, 64, 0).setScrollFactor(0).setDepth(90);
+    this.assistHint = this.add
+      .text(GAME_WIDTH / 2, 925, '', { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#7be08f', stroke: '#000', strokeThickness: 3 })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(90)
+      .setAlpha(0.85);
   }
 
   update(_time: number, delta: number): void {
@@ -124,6 +145,8 @@ export class GameScene extends Phaser.Scene {
   private movePlayer(dt: number): void {
     let dx = 0;
     let dy = 0;
+    let sprint: boolean;
+    let keyboard = false;
     const k = this.keys;
     if (k.left.isDown || k.a.isDown) dx -= 1;
     if (k.right.isDown || k.d.isDown) dx += 1;
@@ -134,10 +157,24 @@ export class GameScene extends Phaser.Scene {
       const len = Math.hypot(dx, dy) / (k.shift.isDown ? WALK_FACTOR : 1);
       dx /= len;
       dy /= len;
+      keyboard = true;
+      sprint = k.sprint.isDown;
     } else {
       dx = this.joystick.vector.x;
       dy = this.joystick.vector.y;
+      sprint = Math.hypot(dx, dy) >= ASSIST_BREAK_STRENGTH;
     }
+
+    // Crowd pace assist: slow to the group's pace so the player stays hidden
+    // without precise thumb control. Sprint or a full push breaks out.
+    const wanted = Math.hypot(dx, dy) * PLAYER_SPEED;
+    const cap = sprint ? Infinity : this.assistCap(dx, dy);
+    this.assisting = wanted > cap;
+    if (this.assisting) {
+      dx *= cap / wanted;
+      dy *= cap / wanted;
+    }
+    this.assistHint.setText(this.assisting ? (keyboard ? 'Hold Space to break cover' : 'Push to the edge to break cover') : '');
 
     const step = (PLAYER_SPEED * dt) / 1000;
     const fromX = this.player.x;
@@ -161,6 +198,22 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: this.coinLabel, scale: 1.25, duration: 90, yoyo: true });
       playCoin(this, c.valuable);
     }
+  }
+
+  /** Speed cap from the crowd pace assist for input (dx, dy), or Infinity when it does not apply. */
+  private assistCap(dx: number, dy: number): number {
+    const len = Math.hypot(dx, dy);
+    if (len === 0) return Infinity;
+    const minDot = Math.cos(Phaser.Math.DegToRad(ASSIST_ANGLE_DEG));
+    let marching = 0;
+    let standing = false;
+    for (const c of this.crowds) {
+      if (!c.contains(this.player.x, this.player.y)) continue;
+      if (c.speed === 0) standing = true;
+      else if ((dx * c.headingX + dy * c.headingY) / len >= minDot) marching = Math.max(marching, c.speed * ASSIST_PACE_FACTOR);
+    }
+    if (marching > 0) return marching;
+    return standing ? HIDE_SPEED_FLOOR * ASSIST_FLOOR_FACTOR : Infinity;
   }
 
   /** Returns the corrected coordinate on one axis after pushing out of blockers and world edges. */
@@ -190,7 +243,7 @@ export class GameScene extends Phaser.Scene {
     this.suspicion = seen
       ? this.suspicion + dt * (this.hidden ? HIDDEN_DETECTION_RATE : 1)
       : Math.max(0, this.suspicion - dt * SUSPICION_DECAY);
-    const alert = Math.min(1, this.suspicion / CATCH_TIME_MS);
+    const alert = Math.min(1, this.suspicion / this.catchTimeMs);
 
     for (const o of this.officers) {
       const seesPlayer = seen && o.canSee(this.player.x, this.player.y, this.blockers);
@@ -207,7 +260,7 @@ export class GameScene extends Phaser.Scene {
 
     this.hiddenIcon.setVisible(this.hidden).setPosition(x, y - 58 * CHARACTER_SCALE);
 
-    if (this.suspicion >= CATCH_TIME_MS) this.end('caught');
+    if (this.suspicion >= this.catchTimeMs) this.end('caught');
   }
 
   /** Small bubble with three heads, shown above the player while hidden in a crowd. */

@@ -2,7 +2,7 @@
 // officer's (and crowd's) future movement. Answers "can a perfect player
 // finish?" and, with bigger cones, "how much slack does that route have?".
 // Usage: node tools/solve.mjs src/levels/level-01.json [--crowds] [--range-mul 1.2] [--angle-add 10]
-//                             [--cap 500] [--max-sec 120] [--draw route.png]
+//                             [--cap ms] [--max-sec 120] [--draw route.png] [--difficulty easy]
 import { parseArgs, run } from './lib.mjs';
 
 const args = parseArgs();
@@ -16,8 +16,10 @@ function solve(opts) {
   const Off = s.officers[0].constructor;
   const CrowdC = s.crowds[0]?.constructor;
   const N = Math.round((opts.maxSec * 1000) / T);
-  const offs = L.officers.map((d) => new Off(s, d));
-  const probes = L.officers.map((d) => new Off(s, { ...d, visionRange: d.visionRange * opts.rangeMul, visionAngle: d.visionAngle + opts.angleAdd }));
+  // The scene's officer data already has the difficulty's cone length applied.
+  const officerData = s.officers.map((o) => o.data);
+  const offs = officerData.map((d) => new Off(s, d));
+  const probes = officerData.map((d) => new Off(s, { ...d, visionRange: d.visionRange * opts.rangeMul, visionAngle: d.visionAngle + opts.angleAdd }));
   const crowds = opts.crowds && CrowdC ? L.crowds.map((d) => new CrowdC(s, d)) : [];
   // Replay officers and crowds once, recording their state at every step.
   const oState = [], cState = [];
@@ -71,7 +73,8 @@ function solve(opts) {
 }
 
 await run(args._[0], async (page) => {
-  const opts = { crowds: !!args.crowds, rangeMul: args['range-mul'] ?? 1, angleAdd: args['angle-add'] ?? 0, cap: args.cap ?? 500, maxSec: args['max-sec'] ?? 120 };
+  const opts = { crowds: !!args.crowds, rangeMul: args['range-mul'] ?? 1, angleAdd: args['angle-add'] ?? 0, cap: args.cap, maxSec: args['max-sec'] ?? 120 };
+  opts.cap ??= await page.evaluate(() => window.__scene.catchTimeMs);
   const r = await page.evaluate(solve, opts);
   const desc = `${opts.crowds ? 'with crowds' : 'solo'}, cone range x${opts.rangeMul}, angle +${opts.angleAdd} deg, caught at ${opts.cap}ms`;
   if (r.solved) console.log(`${desc}: route found, reaches the finish at ${r.sec}s`);

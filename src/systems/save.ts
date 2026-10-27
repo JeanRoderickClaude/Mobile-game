@@ -1,3 +1,4 @@
+import { DEFAULT_DIFFICULTY, DIFFICULTIES, type Difficulty } from '../config';
 import { DEFAULT_ITEMS, DEFAULT_LOOK, isKnownItem, type PlayerLook } from '../entities/cosmetics';
 import { itemById, type ItemCategory, type ShopItem } from '../data/items';
 
@@ -14,10 +15,12 @@ export interface SaveData {
   /** Ids of bought shop items. Default items are always owned and not listed. */
   owned: string[];
   equipped: Record<ItemCategory, string>;
+  /** Saves from before difficulties existed load as DEFAULT_DIFFICULTY. */
+  difficulty: Difficulty;
 }
 
 function fresh(): SaveData {
-  return { coins: 0, owned: [], equipped: { ...DEFAULT_ITEMS } };
+  return { coins: 0, owned: [], equipped: { ...DEFAULT_ITEMS }, difficulty: DEFAULT_DIFFICULTY };
 }
 
 let state: SaveData = load();
@@ -50,6 +53,7 @@ function sanitize(input: unknown): SaveData {
       if (typeof id === 'string' && isKnownItem(category, id) && ownsIn(out, category, id)) out.equipped[category] = id;
     }
   }
+  if (typeof data.difficulty === 'string' && Object.hasOwn(DIFFICULTIES, data.difficulty)) out.difficulty = data.difficulty;
   return out;
 }
 
@@ -96,6 +100,15 @@ export function equip(category: ItemCategory, id: string): boolean {
   state.equipped[category] = id;
   persist();
   return true;
+}
+
+export function getDifficulty(): Difficulty {
+  return state.difficulty;
+}
+
+export function setDifficulty(difficulty: Difficulty): void {
+  state.difficulty = difficulty;
+  persist();
 }
 
 /** The look the player wears in a run. */
