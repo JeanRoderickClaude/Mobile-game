@@ -4,6 +4,8 @@ A top-down cartoon browser game. The player is a protestor who walks a route fro
 
 Live build: https://jeanroderickclaude.github.io/Mobile-game/ (redeployed on every push to `main`).
 
+The live site is the owner's personal test build. When the owner asks for a feature to go live, merging it into `main` and pushing is approved.
+
 ## Commands
 
 - `npm install` once.
