@@ -151,6 +151,8 @@ export interface LevelData {
   noir?: { zones: NoirZone[] };
   /** Optional. Night: dark outside lit pools, so officers only spot an unlit player at the difficulty's darkRangeFactor of their range. */
   night?: { lights: LightData[] };
+  /** Optional. Chase rule: when the seen meter fills, the officer chases Pip instead of catching him on the spot; only a chasing officer touching Pip catches him. Default false. */
+  chaseMode?: boolean;
   /** Optional. Poster spots; the finish stays closed until `required` are planted, and each one past that pays `bonusCoins`. */
   posters?: { spots: PosterSpot[]; required: number; bonusCoins: number };
   /** Optional. Stand-still spots such as tagging a van. */

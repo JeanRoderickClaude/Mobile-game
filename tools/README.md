@@ -133,6 +133,24 @@ node tools/posters.mjs src/levels/level-03.json --light
 
 `--light` prints only the spot report. Each plan gives survivals, average time and coins of the survivors, and `caught at` positions.
 
+## chase.mjs: do chases and searches work, and who gets away?
+
+For levels with `"chaseMode": true`, such as the development practice level `src/levels/dev/practice-chase.json`. For each of 23 start times (`--starts`, `--every`) the level runs with the officers at a different point of their routes. Pip waits unseen at the start, is placed at the spot (`--spot x,y`, default 245,1140) and spotted: the nearest officer starts chasing and the others join as the level's rules say. Then one of these players takes over, both on a navigation grid like the officers' (with a wider margin for Pip's body):
+
+- `run`: keeps running in the open at full speed, to the far end of the level and back, whatever happens.
+- `hide`: runs for the nearest cover (behind a building, away from every officer and not past one) and on for the far end until the chasers lose him, then runs to a point on the marching crowd's route that he reaches first, slows to crowd pace on the last stretch, falls in with the crowd and walks on inside it.
+- `--hold` adds `hold`: stands still where he was spotted.
+
+The level does not end at the finish. A run ends when Pip is caught (a chasing officer touches him), when every officer is back on patrol with Pip free ("got away"), or after 60 s. The output gives, per player, how many got away, were caught or were still chased, how many runs had a search begin, how long until the chase was over, how many officers chased at once, and for `hide` how often a searching officer came within 80 units of him while he was hidden and how often it noticed him. `caught at` lists where.
+
+```
+node tools/chase.mjs src/levels/dev/practice-chase.json --hold
+node tools/chase.mjs src/levels/dev/practice-chase.json --difficulty easy
+node tools/chase.mjs src/levels/dev/practice-chase.json --trace hide,5 --shots shots
+```
+
+`--trace policy,N` prints a line every 500 ms for one run (start number N): Pip, whether he is hidden, and each officer's state (`C` chasing, `S` searching, `r` walking back, `.` patrol), position and distance. With `--shots dir` it also saves screenshots of that run: the spot, the first search, every 4 s, and when the officers are back on patrol. Pass the file path as for the other tools (levels in `src/levels/dev/` work).
+
 ## Balancing workflow
 
 Edit the level JSON, then run ride.mjs (crowds safe), blind.mjs (solo risky), stand.mjs (standing groups useful), solve.mjs (solo still possible) and coins.mjs (route coins safe, valuable coins risky). When a crowd ride fails, look at the officer with the longest sighting. Officers walking the same direction as a crowd, just behind it, are the usual cause; crosswise sweeps with narrow cones are kinder to crowds.

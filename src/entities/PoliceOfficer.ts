@@ -1,12 +1,21 @@
 import Phaser from 'phaser';
-import { ALERT_LOOK_MS, ALERT_SPEED_FACTOR, CHARACTER_SCALE, COLORS, OFFICER_TURN_SPEED, VISION_RAYS } from '../config';
-import type { LightData, OfficerData, Rect } from '../levels/types';
+import {
+  ALERT_LOOK_MS, ALERT_SPEED_FACTOR, CHARACTER_SCALE, CHASE_REPATH_MS, COLORS, OFFICER_TURN_SPEED, SEARCH_PAUSE_MS, SEARCH_POINTS, SEARCH_RADIUS,
+  VISION_RAYS,
+} from '../config';
+import type { LightData, OfficerData, Point, Rect } from '../levels/types';
 import { angleDiff, castRay, hasLineOfSight } from '../systems/geometry';
+import type { NavGrid } from '../systems/nav';
+
+type State = 'patrol' | 'going' | 'looking' | 'returning' | 'chasing' | 'searchGo' | 'searching';
 
 /**
- * A police officer walking a fixed patrol route with a vision cone. When
- * called by noise (investigate), they leave the route, walk to the spot,
- * look around for ALERT_LOOK_MS and walk back to where they left it.
+ * A police officer walking a fixed patrol route with a vision cone. Every walk
+ * to a target goes through the level's navigation grid, so officers go around
+ * buildings. When called by noise (investigate), they leave the route, walk to
+ * the spot, look around for ALERT_LOOK_MS and walk back. In chase levels they
+ * can also chase Pip (beginChase), go to the last seen spot when the chase
+ * loses him (startSearch), check a few points around it, and walk back.
  */
 export class PoliceOfficer {
   /**
@@ -28,6 +37,12 @@ export class PoliceOfficer {
     return !s.night || PoliceOfficer.lit(x, y) ? 1 : s.darkFactor;
   }
 
+  /** Navigation grid of the level, set by GameScene. Without one, officers walk straight lines. */
+  static nav: NavGrid | null = null;
+
+  /** Chase and search values of the difficulty, set by GameScene. */
+  static rules = { chaseSpeed: 160, searchMs: 8000, closeRange: 55 };
+
   readonly data: OfficerData;
   /** Outline of the last drawn cone (x, y pairs, starting at the officer), for the night overlay's flashlight holes. */
   beam: number[] = [];
@@ -41,13 +56,22 @@ export class PoliceOfficer {
   private direction = 1; // +1 forward, -1 backward (pingpong only)
   private pauseLeft = 0;
   private halfAngle: number;
-  private alert: 'none' | 'going' | 'looking' | 'returning' = 'none';
-  private alertX = 0;
-  private alertY = 0;
+  private state: State = 'patrol';
+  private goalX = 0; // where the officer is walking to
+  private goalY = 0;
   private homeX = 0; // where the officer left the patrol route
   private homeY = 0;
   private lookLeft = 0;
   private lookBase = 0;
+  private path: Point[] = [];
+  private pathGX = NaN; // the goal the current path was planned for
+  private pathGY = NaN;
+  private repathLeft = 0;
+  private searchLeft = 0;
+  private searchPoints: Point[] = [];
+  private searchIndex = 0;
+  private searchPause = 0;
+  private rand: () => number;
   private alertMark: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene, data: OfficerData) {
@@ -55,6 +79,11 @@ export class PoliceOfficer {
     this.x = data.patrol[0].x;
     this.y = data.patrol[0].y;
     this.halfAngle = Phaser.Math.DegToRad(data.visionAngle) / 2;
+    let seed = (Math.round(data.patrol[0].x * 7 + data.patrol[0].y * 13) | 0) || 1;
+    this.rand = () => {
+      seed = (seed * 1664525 + 1013904223) | 0;
+      return ((seed >>> 0) % 100000) / 100000;
+    };
     if (data.patrol.length < 2) this.target = 0;
     const next = data.patrol[this.target];
     this.facing = next === data.patrol[0] ? -Math.PI / 2 : Math.atan2(next.y - this.y, next.x - this.x);
@@ -69,25 +98,99 @@ export class PoliceOfficer {
     this.syncSprite();
   }
 
-  /** True while walking to a noise, looking around, or walking back. */
+  /** True when off the patrol route for any reason: noise, chase, search or walking back. */
   get alerted(): boolean {
-    return this.alert !== 'none';
+    return this.state !== 'patrol';
   }
 
-  /** Walk to (x, y) and look around there. A new call while alerted moves the spot. */
-  investigate(x: number, y: number): void {
-    if (this.alert === 'none') {
+  get chasing(): boolean {
+    return this.state === 'chasing';
+  }
+
+  get searching(): boolean {
+    return this.state === 'searchGo' || this.state === 'searching';
+  }
+
+  /** On patrol, called by noise, or walking back: these officers fill the seen meter. */
+  get watching(): boolean {
+    return !this.chasing && !this.searching;
+  }
+
+  /** Length of the walk from here to (x, y) on the navigation grid, or Infinity when there is none. */
+  walkDistanceTo(x: number, y: number): number {
+    const nav = PoliceOfficer.nav;
+    if (!nav) return Math.hypot(x - this.x, y - this.y);
+    const path = nav.findPath(this.x, this.y, x, y);
+    if (!path.length) return Infinity;
+    let len = 0;
+    let px = this.x;
+    let py = this.y;
+    for (const p of path) {
+      len += Math.hypot(p.x - px, p.y - py);
+      px = p.x;
+      py = p.y;
+    }
+    return len;
+  }
+
+  /** Remember where the officer left the patrol route, once. */
+  private leavePatrol(): void {
+    if (this.state === 'patrol') {
       this.homeX = this.x;
       this.homeY = this.y;
     }
-    this.alert = 'going';
-    this.alertX = x;
-    this.alertY = y;
+  }
+
+  /** Walk to (x, y) and look around there. A new call while alerted moves the spot. Ignored during a chase or search. */
+  investigate(x: number, y: number): void {
+    if (this.chasing || this.searching) return;
+    this.leavePatrol();
+    this.state = 'going';
+    this.setGoal(x, y);
+  }
+
+  /** Start (or keep) chasing: run after the shared target, set with chaseTo. */
+  beginChase(x: number, y: number): void {
+    this.leavePatrol();
+    this.state = 'chasing';
+    this.setGoal(x, y);
+  }
+
+  /** New target for a chasing officer: where Pip was last seen. */
+  chaseTo(x: number, y: number): void {
+    if (this.state === 'chasing') this.setGoal(x, y);
+  }
+
+  /** The chase lost Pip: go to the last seen spot, then check around it. */
+  startSearch(x: number, y: number): void {
+    if (this.state !== 'chasing') return;
+    this.state = 'searchGo';
+    this.setGoal(x, y);
+    this.searchPoints = [];
+  }
+
+  /** Pip's last seen spot, for the searching officer. */
+  private setGoal(x: number, y: number): void {
+    this.goalX = x;
+    this.goalY = y;
+  }
+
+  /**
+   * Whether this officer notices Pip at (px, py). Searching officers only
+   * notice a player who is hidden (in a crowd at its pace) or standing in the
+   * dark at night within a short close range, in any direction; otherwise the
+   * normal cone applies.
+   */
+  notices(px: number, py: number, blockers: Rect[], hidden: boolean): boolean {
+    if (this.searching && (hidden || PoliceOfficer.rangeFactorAt(px, py) < 1)) {
+      return Math.hypot(px - this.x, py - this.y) <= PoliceOfficer.rules.closeRange && hasLineOfSight(this.x, this.y, px, py, blockers);
+    }
+    return this.canSee(px, py, blockers);
   }
 
   update(deltaMs: number): void {
     const dt = deltaMs / 1000;
-    if (this.alert !== 'none') {
+    if (this.state !== 'patrol') {
       this.updateAlert(deltaMs);
       this.syncSprite();
       return;
@@ -128,41 +231,140 @@ export class PoliceOfficer {
 
   private updateAlert(deltaMs: number): void {
     const dt = deltaMs / 1000;
-    if (this.alert === 'looking') {
-      // Sweep the cone left and right around the direction they arrived from.
-      this.lookLeft -= deltaMs;
-      const t = 1 - this.lookLeft / ALERT_LOOK_MS;
-      this.facing = this.lookBase + Math.sin(t * Math.PI * 3) * 1.2;
-      if (this.lookLeft <= 0) this.alert = 'returning';
-      return;
+    this.repathLeft -= deltaMs;
+    const rules = PoliceOfficer.rules;
+    switch (this.state) {
+      case 'looking': {
+        // Sweep the cone left and right around the direction they arrived from.
+        this.lookLeft -= deltaMs;
+        const t = 1 - this.lookLeft / ALERT_LOOK_MS;
+        this.facing = this.lookBase + Math.sin(t * Math.PI * 3) * 1.2;
+        if (this.lookLeft <= 0) this.beginReturn();
+        return;
+      }
+      case 'going':
+        if (this.walkTo(this.goalX, this.goalY, this.data.speed * ALERT_SPEED_FACTOR, dt, 1.5)) {
+          this.state = 'looking';
+          this.lookLeft = ALERT_LOOK_MS;
+          this.lookBase = this.facing;
+        }
+        return;
+      case 'chasing':
+        // Run to the shared target; standing there means Pip is not in sight, and the scene will start the search.
+        this.walkTo(this.goalX, this.goalY, rules.chaseSpeed, dt, 4);
+        return;
+      case 'searchGo':
+        if (this.walkTo(this.goalX, this.goalY, rules.chaseSpeed, dt, 3)) {
+          this.state = 'searching';
+          this.searchLeft = rules.searchMs;
+          this.searchPoints = this.pickSearchPoints(this.goalX, this.goalY);
+          this.searchIndex = 0;
+          this.searchPause = SEARCH_PAUSE_MS;
+          this.lookBase = this.facing;
+        }
+        return;
+      case 'searching': {
+        this.searchLeft -= deltaMs;
+        if (this.searchLeft <= 0) {
+          this.beginReturn();
+          return;
+        }
+        if (this.searchPause > 0) {
+          // Look around at the point: a slow sweep.
+          this.searchPause -= deltaMs;
+          const t = 1 - this.searchPause / SEARCH_PAUSE_MS;
+          this.facing = this.lookBase + Math.sin(t * Math.PI * 2) * 1.1;
+          return;
+        }
+        const p = this.searchPoints[this.searchIndex % this.searchPoints.length];
+        if (this.walkTo(p.x, p.y, Math.max(70, this.data.speed * ALERT_SPEED_FACTOR), dt, 3)) {
+          this.searchIndex++;
+          this.searchPause = SEARCH_PAUSE_MS;
+          this.lookBase = this.facing;
+        }
+        return;
+      }
+      case 'returning':
+        if (this.walkTo(this.homeX, this.homeY, this.data.speed, dt, 1.5)) {
+          this.state = 'patrol';
+          this.pauseLeft = 0;
+          this.path = [];
+        }
+        return;
+      default:
+        return;
     }
-    const going = this.alert === 'going';
-    const gx = going ? this.alertX : this.homeX;
-    const gy = going ? this.alertY : this.homeY;
-    const dx = gx - this.x;
-    const dy = gy - this.y;
+  }
+
+  private beginReturn(): void {
+    this.state = 'returning';
+    this.setGoal(this.homeX, this.homeY);
+    this.path = [];
+    this.pathGX = NaN;
+  }
+
+  /** A few free points around (cx, cy), at random distances, that can be walked to. */
+  private pickSearchPoints(cx: number, cy: number): Point[] {
+    const nav = PoliceOfficer.nav;
+    const pts: Point[] = [];
+    // Spread the points around the circle so they do not all lie one way.
+    const base = this.rand() * Math.PI * 2;
+    for (let k = 0; k < SEARCH_POINTS; k++) {
+      for (let tries = 0; tries < 24; tries++) {
+        const a = base + (k / SEARCH_POINTS) * Math.PI * 2 + (this.rand() - 0.5) * 1.2;
+        const r = SEARCH_RADIUS[0] + this.rand() * (SEARCH_RADIUS[1] - SEARCH_RADIUS[0]);
+        const p = { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r };
+        if (!nav || (nav.isFree(p.x, p.y) && nav.findPath(cx, cy, p.x, p.y).length > 0)) {
+          pts.push(p);
+          break;
+        }
+      }
+    }
+    return pts.length ? pts : [{ x: cx, y: cy }];
+  }
+
+  /**
+   * Walk toward (gx, gy) along a route planned on the navigation grid, at
+   * speed, turning toward the direction of travel. The route is re-planned
+   * when the goal moves (at most every CHASE_REPATH_MS). Returns true on
+   * arrival, and also when no route exists, so officers never get stuck.
+   */
+  private walkTo(gx: number, gy: number, speed: number, dt: number, turnMul: number): boolean {
+    const nav = PoliceOfficer.nav;
+    const distGoal = Math.hypot(gx - this.x, gy - this.y);
+    if (distGoal < 3) return true;
+    let tx = gx;
+    let ty = gy;
+    if (nav) {
+      const goalMoved = Math.hypot(gx - this.pathGX, gy - this.pathGY) > 8;
+      if (Number.isNaN(this.pathGX) || (goalMoved && this.repathLeft <= 0) || (this.path.length === 0 && distGoal >= 36)) {
+        this.path = nav.findPath(this.x, this.y, gx, gy);
+        this.pathGX = gx;
+        this.pathGY = gy;
+        this.repathLeft = CHASE_REPATH_MS;
+        if (this.path.length === 0 && distGoal >= 36) return true; // unreachable
+      }
+      while (this.path.length && Math.hypot(this.path[0].x - this.x, this.path[0].y - this.y) < 2) this.path.shift();
+      if (this.path.length) {
+        tx = this.path[0].x;
+        ty = this.path[0].y;
+      }
+    }
+    const dx = tx - this.x;
+    const dy = ty - this.y;
     const dist = Math.hypot(dx, dy);
-    const step = this.data.speed * (going ? ALERT_SPEED_FACTOR : 1) * dt;
-    if (dist > 0) {
-      const diff = angleDiff(Math.atan2(dy, dx), this.facing);
-      const maxTurn = OFFICER_TURN_SPEED * 1.5 * dt;
-      this.facing += Phaser.Math.Clamp(diff, -maxTurn, maxTurn);
-    }
-    if (dist > step) {
+    const step = speed * dt;
+    const diff = angleDiff(Math.atan2(dy, dx), this.facing);
+    this.facing += Phaser.Math.Clamp(diff, -OFFICER_TURN_SPEED * turnMul * dt, OFFICER_TURN_SPEED * turnMul * dt);
+    if (dist <= step) {
+      this.x = tx;
+      this.y = ty;
+      if (this.path.length) this.path.shift();
+    } else {
       this.x += (dx / dist) * step;
       this.y += (dy / dist) * step;
-      return;
     }
-    this.x = gx;
-    this.y = gy;
-    if (going) {
-      this.alert = 'looking';
-      this.lookLeft = ALERT_LOOK_MS;
-      this.lookBase = this.facing;
-    } else {
-      this.alert = 'none';
-      this.pauseLeft = 0;
-    }
+    return Math.hypot(gx - this.x, gy - this.y) < 3;
   }
 
   /** True when the point is inside the vision cone and nothing blocks the view. */
@@ -254,6 +456,13 @@ export class PoliceOfficer {
   private syncSprite(): void {
     this.sprite.setPosition(this.x, this.y);
     this.sprite.rotation = this.facing + Math.PI / 2;
-    this.alertMark.setVisible(this.alert === 'going' || this.alert === 'looking').setPosition(this.x, this.y - 34);
+    const chase = this.state === 'chasing';
+    const question = this.state === 'going' || this.state === 'looking' || this.searching;
+    this.alertMark
+      .setText(chase ? '!' : '?')
+      .setColor(chase ? '#ff4a4a' : '#ffd23f')
+      .setFontSize(chase ? 32 : 26)
+      .setVisible(chase || question)
+      .setPosition(this.x, this.y - 34);
   }
 }

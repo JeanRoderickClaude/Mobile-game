@@ -1,0 +1,37 @@
+{
+  "id": "practice-chase",
+  "name": "Practice: Chase",
+  "width": 540,
+  "height": 1500,
+  "start": {"x": 245, "y": 1470},
+  "finish": {"x": 0, "y": 0, "width": 540, "height": 90},
+  "chaseMode": true,
+  "obstacles": [
+    {"type": "building", "x": 90, "y": 1300, "width": 110, "height": 150},
+    {"type": "building", "x": 290, "y": 1300, "width": 110, "height": 150},
+    {"type": "building", "x": 490, "y": 1300, "width": 50, "height": 150},
+    {"type": "building", "x": 90, "y": 1060, "width": 110, "height": 150},
+    {"type": "building", "x": 290, "y": 1060, "width": 110, "height": 150},
+    {"type": "building", "x": 490, "y": 1060, "width": 50, "height": 150},
+    {"type": "building", "x": 90, "y": 820, "width": 110, "height": 150},
+    {"type": "building", "x": 290, "y": 820, "width": 110, "height": 150},
+    {"type": "building", "x": 490, "y": 820, "width": 50, "height": 150},
+    {"type": "building", "x": 90, "y": 580, "width": 110, "height": 150},
+    {"type": "building", "x": 490, "y": 580, "width": 50, "height": 150},
+    {"type": "building", "x": 90, "y": 340, "width": 110, "height": 150},
+    {"type": "building", "x": 490, "y": 340, "width": 50, "height": 150},
+    {"type": "building", "x": 90, "y": 100, "width": 110, "height": 150},
+    {"type": "building", "x": 290, "y": 100, "width": 110, "height": 150},
+    {"type": "building", "x": 490, "y": 100, "width": 50, "height": 150},
+    {"type": "building", "x": 258, "y": 500, "width": 64, "height": 64, "color": "#9aa7b0"},
+    {"type": "car", "x": 345, "y": 620, "width": 70, "height": 36}
+  ],
+  "officers": [
+    {"patrol": [{"x": 445, "y": 1015}, {"x": 445, "y": 535}], "mode": "pingpong", "speed": 50, "pauseMs": 700, "visionRange": 220, "visionAngle": 60},
+    {"patrol": [{"x": 120, "y": 535}, {"x": 420, "y": 535}], "mode": "pingpong", "speed": 55, "pauseMs": 600, "visionRange": 230, "visionAngle": 60},
+    {"patrol": [{"x": 45, "y": 1255}, {"x": 245, "y": 1255}], "mode": "pingpong", "speed": 50, "pauseMs": 600, "visionRange": 200, "visionAngle": 55}
+  ],
+  "crowds": [
+    {"type": "marching", "size": 8, "intervalMs": 1000, "delayMs": 0, "path": [{"x": 245, "y": 1490}, {"x": 245, "y": 1255}, {"x": 45, "y": 1255}, {"x": 45, "y": 1015}, {"x": 445, "y": 1015}, {"x": 445, "y": 775}, {"x": 245, "y": 775}, {"x": 245, "y": 535}, {"x": 45, "y": 535}, {"x": 45, "y": 295}, {"x": 245, "y": 295}, {"x": 245, "y": 50}]}
+  ]
+}

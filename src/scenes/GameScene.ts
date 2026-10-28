@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import {
   ASSIST_ANGLE_DEG, ASSIST_BREAK_STRENGTH, ASSIST_FLOOR_FACTOR, ASSIST_PACE_MAX, ASSIST_PACE_MIN, ASSIST_SETTLE_DIST, CHARACTER_SCALE, COIN_PICKUP_RADIUS, DIFFICULTIES, type Difficulty, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
-  POSTER_ZONE, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, RING_INTERVAL_MS, RING_LIFE_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
+  CHASE_LOST_MS, NOISE_WALK_FACTOR, OFFICER_RADIUS, POSTER_ZONE, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, RING_INTERVAL_MS, RING_LIFE_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
 } from '../config';
 import { Bystanders } from '../entities/Bystanders';
 import { Character } from '../entities/Character';
@@ -14,10 +14,11 @@ import type { Obstacle, Rect, ResolvedLevel } from '../levels/types';
 import type { Flags } from '../story/flags';
 import { CHAPTERS, isPlayable, pickScene } from '../story/story';
 import { finishBonus } from '../systems/economy';
-import { hasLineOfSight, overlaps } from '../systems/geometry';
+import { overlaps } from '../systems/geometry';
 import { Noir } from '../systems/noir';
 import { NightOverlay } from '../systems/night';
 import { StandSpots } from '../entities/StandSpots';
+import { NavGrid } from '../systems/nav';
 import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags, setFlags } from '../systems/save';
 import { playCoin } from '../systems/sfx';
 import { VirtualJoystick } from '../systems/VirtualJoystick';
@@ -60,6 +61,10 @@ export class GameScene extends Phaser.Scene {
   private trumpetButton: Phaser.GameObjects.Container | null = null;
   /** Set by the balance tools to play without a key or touch. */
   trumpetOverride = false;
+  /** Chase levels: where the chasing officers last saw Pip, and for how long none has. */
+  private chaseLastX = 0;
+  private chaseLastY = 0;
+  private chaseLostMs = 0;
   /** Night darkness over the screen, in levels with "night". */
   private nightOverlay: NightOverlay | null = null;
   /** Poster and tag spots, the poster count in the HUD, and the closed finish. */
@@ -70,8 +75,6 @@ export class GameScene extends Phaser.Scene {
   /** The gray look and its colour mask, in levels with "noir". */
   private noir: Noir | null = null;
   private colorBar: Phaser.GameObjects.Graphics | null = null;
-  /** Obstacles grown by an officer's half-size, for checking who can walk straight to a noise. */
-  private walkBlockers: Rect[] = [];
   private difficulty: Difficulty = 'normal';
   private catchTimeMs = 500;
   private suspicion = 0; // ms of accumulated sight, caught at catchTimeMs
@@ -104,7 +107,6 @@ export class GameScene extends Phaser.Scene {
     this.playerSpeed = 0;
     this.hidden = false;
     this.blockers = this.level.obstacles;
-    this.walkBlockers = this.blockers.map((b) => ({ x: b.x - 14, y: b.y - 14, width: b.width + 28, height: b.height + 28 }));
     this.playing = false;
     this.noise = 0;
     this.ringClock = 0;
@@ -118,6 +120,9 @@ export class GameScene extends Phaser.Scene {
     this.posterText = null;
     this.gate = null;
     const cfg = DIFFICULTIES[this.difficulty];
+    this.chaseLostMs = 0;
+    PoliceOfficer.nav = new NavGrid(this.level.width, this.level.height, this.level.obstacles);
+    PoliceOfficer.rules = { chaseSpeed: PLAYER_SPEED * cfg.chaseSpeedFactor, searchMs: cfg.searchMs, closeRange: cfg.searchCloseRange };
     PoliceOfficer.sight = this.level.night
       ? { night: true, lights: this.level.night.lights, darkFactor: cfg.darkRangeFactor }
       : { night: false, lights: [], darkFactor: 1 };
@@ -349,15 +354,18 @@ export class GameScene extends Phaser.Scene {
     this.hidden =
       this.crowds.some((c) => c.contains(x, y) && this.playerSpeed <= Math.max(c.speed * HIDE_SPEED_MARGIN, HIDE_SPEED_FLOOR)) ||
       this.bystanders.hides(x, y, this.playerSpeed);
-    const seen = this.officers.some((o) => o.canSee(x, y, this.blockers));
+    // Who notices Pip this frame. Searching officers only notice a hidden player (crowd, or dark at night) at close range.
+    const noticing = this.officers.filter((o) => o.notices(x, y, this.blockers, this.hidden));
+    // In chase levels only officers that are not already chasing or searching fill the meter.
+    const seen = this.level.chaseMode ? noticing.some((o) => o.watching) : noticing.length > 0;
     this.suspicion = seen
       ? this.suspicion + dt * (this.hidden ? HIDDEN_DETECTION_RATE : 1)
       : Math.max(0, this.suspicion - dt * SUSPICION_DECAY);
     const alert = Math.min(1, this.suspicion / this.catchTimeMs);
 
     for (const o of this.officers) {
-      const seesPlayer = seen && o.canSee(this.player.x, this.player.y, this.blockers);
-      o.drawCone(this.blockers, seesPlayer ? alert : 0);
+      const seesPlayer = seen && noticing.includes(o);
+      o.drawCone(this.blockers, o.chasing ? 1 : seesPlayer ? alert : 0);
     }
 
     this.meter.clear();
@@ -370,7 +378,51 @@ export class GameScene extends Phaser.Scene {
 
     this.hiddenIcon.setVisible(this.hidden).setPosition(x, y - 58 * CHARACTER_SCALE);
 
-    if (this.suspicion >= this.catchTimeMs) this.end('caught');
+    if (this.level.chaseMode) this.updateChase(dt, noticing);
+    else if (this.suspicion >= this.catchTimeMs) this.end('caught');
+  }
+
+  /**
+   * Chase rule. A full meter sends the officers who see Pip after him; a chasing
+   * officer alerts every officer within the difficulty's radius, who join. They all
+   * run to where any chaser last saw Pip. When none sees him for CHASE_LOST_MS they
+   * all go to that spot and search. A searching officer who notices Pip chases again.
+   * Only a chasing officer touching Pip catches him.
+   */
+  private updateChase(dt: number, noticing: PoliceOfficer[]): void {
+    const { x, y } = this.player;
+    const cfg = DIFFICULTIES[this.difficulty];
+    if (this.suspicion >= this.catchTimeMs) {
+      for (const o of noticing) if (o.watching) o.beginChase(x, y);
+      this.chaseLastX = x;
+      this.chaseLastY = y;
+      this.chaseLostMs = 0;
+      this.suspicion = 0;
+    }
+    for (const o of noticing) if (o.searching) o.beginChase(x, y);
+
+    let chasers = this.officers.filter((o) => o.chasing);
+    if (!chasers.length) return;
+    // Officers within reach of a chaser join, wherever they are in their routine.
+    for (const o of this.officers) {
+      if (o.chasing) continue;
+      if (chasers.some((c) => Math.hypot(c.x - o.x, c.y - o.y) <= cfg.chaseAlertRadius)) o.beginChase(this.chaseLastX, this.chaseLastY);
+    }
+    chasers = this.officers.filter((o) => o.chasing);
+
+    if (chasers.some((o) => noticing.includes(o))) {
+      this.chaseLastX = x;
+      this.chaseLastY = y;
+      this.chaseLostMs = 0;
+    } else {
+      this.chaseLostMs += dt;
+    }
+    for (const o of chasers) o.chaseTo(this.chaseLastX, this.chaseLastY);
+    if (this.chaseLostMs >= CHASE_LOST_MS) {
+      for (const o of chasers) o.startSearch(this.chaseLastX, this.chaseLastY);
+      this.chaseLostMs = 0;
+    }
+    if (chasers.some((o) => Math.hypot(o.x - x, o.y - y) <= PLAYER_RADIUS + OFFICER_RADIUS)) this.end('caught');
   }
 
   /** Small bubble with three heads, shown above the player while hidden in a crowd. */
@@ -470,10 +522,11 @@ export class GameScene extends Phaser.Scene {
     this.playing = this.trumpetOverride || this.keys.space.isDown || this.trumpetPointer !== null;
     this.noise = Phaser.Math.Clamp(this.noise + (dt / 1000) * (this.playing ? cfg.noiseRisePerSec : -cfg.noiseFallPerSec), 0, 1);
     if (this.noise >= 1) {
-      // Too loud: officers close enough, with a clear walk, come to look where Pip is now.
+      // Too loud: officers within hearing come to look where Pip is now, walking round buildings on the navigation grid.
+      // One whose walk is more than NOISE_WALK_FACTOR times the hearing distance is too far round to bother.
       const { x, y } = this.player;
       for (const o of this.officers) {
-        if (Math.hypot(o.x - x, o.y - y) <= this.alertRadius && hasLineOfSight(o.x, o.y, x, y, this.walkBlockers)) o.investigate(x, y);
+        if (Math.hypot(o.x - x, o.y - y) <= this.alertRadius && o.walkDistanceTo(x, y) <= this.alertRadius * NOISE_WALK_FACTOR) o.investigate(x, y);
       }
       this.noise = 0;
       this.cameras.main.flash(180, 255, 80, 80);

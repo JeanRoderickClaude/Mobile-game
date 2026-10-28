@@ -1,6 +1,6 @@
 // Shared setup for the balance tools: start Vite, open the game in headless
 // Chromium, and load one level. Each tool calls run(levelFile, fn).
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -8,11 +8,17 @@ import { createServer } from 'vite';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Index of a level file in play order (file-name order, as src/levels/index.ts sorts them). */
+/**
+ * Index of a level file in play order: the files in src/levels/ by file name, then the
+ * development-only practice levels in src/levels/dev/ (as src/levels/index.ts orders them).
+ */
 function levelIndex(file) {
-  const files = readdirSync(resolve(root, 'src/levels')).filter((f) => f.endsWith('.json')).sort();
-  const i = files.indexOf(basename(file));
-  if (i < 0) throw new Error(`${file} is not in src/levels/. Levels: ${files.join(', ')}`);
+  const list = (dir) => (existsSync(resolve(root, dir)) ? readdirSync(resolve(root, dir)).filter((f) => f.endsWith('.json')).sort() : []);
+  const main = list('src/levels');
+  const dev = list('src/levels/dev');
+  const isDev = resolve(file).split('/').includes('dev');
+  const i = isDev ? main.length + dev.indexOf(basename(file)) : main.indexOf(basename(file));
+  if (i < 0 || (isDev && dev.indexOf(basename(file)) < 0)) throw new Error(`${file} is not in src/levels/ or src/levels/dev/. Levels: ${[...main, ...dev.map((f) => 'dev/' + f)].join(', ')}`);
   return i;
 }
 

@@ -4,10 +4,17 @@ import { MODIFIER_FACTORS, type LevelData } from './types';
 // Every JSON file in this folder is a level. They are played in file-name
 // order, so adding "level-02.json" adds a level without code changes.
 const modules = import.meta.glob<LevelData>('./*.json', { eager: true, import: 'default' });
+// Levels in ./dev/ exist only in development builds (practice levels for trying a mechanic). They come after the
+// real levels, so the real levels keep their indices. In a production build the branch below is removed.
+const devModules = import.meta.env.DEV ? import.meta.glob<LevelData>('./dev/*.json', { eager: true, import: 'default' }) : {};
 
-export const LEVELS: LevelData[] = Object.keys(modules)
-  .sort()
-  .map((path) => validate(modules[path], path));
+export const LEVELS: LevelData[] = [
+  ...Object.keys(modules).sort().map((path) => validate(modules[path], path)),
+  ...Object.keys(devModules).sort().map((path) => validate(devModules[path], path)),
+];
+
+/** Index of the dev-only practice level for the chase and search system, or -1 in production builds. */
+export const PRACTICE_LEVEL_INDEX = LEVELS.findIndex((l) => l.id === 'practice-chase');
 
 function validate(level: LevelData, path: string): LevelData {
   const fail = (msg: string): never => {
@@ -72,6 +79,7 @@ function validate(level: LevelData, path: string): LevelData {
     if (!isPoint(t) || !t.label || !t.flag) fail(`tag ${i} needs "x", "y", "label" and "flag"`);
     if (!(Number.isInteger(t.coins) && t.coins >= 0) || !(t.ms > 0)) fail(`tag ${i} needs whole "coins" (0 or more) and positive "ms"`);
   });
+  if (level.chaseMode !== undefined && typeof level.chaseMode !== 'boolean') fail('"chaseMode" must be true or false');
   if (level.noir !== undefined) {
     if (!level.noir || !Array.isArray(level.noir.zones)) fail('"noir" needs a "zones" array (it may be empty)');
     level.noir.zones.forEach((z, i) => {
