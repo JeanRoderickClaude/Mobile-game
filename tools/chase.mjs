@@ -12,7 +12,7 @@
 // search ended, every officer back on patrol, with Pip not caught.
 // Usage:
 //   node tools/chase.mjs src/levels/dev/practice-chase.json [--starts 23] [--every 1500]
-//        [--spot 245,1140] [--difficulty easy] [--hold] [--speed 1.1] [--react 400] [--join 1500] [--ahead 3] [--spread 70] [--search 8000] [--alert 300] [--why]
+//        [--spot 245,1140] [--difficulty easy] [--hold] [--speed 1.1] [--react 400] [--join 1500] [--ahead 3] [--spread 70] [--search 8000] [--alert 300] [--pursuit 3000] [--only flee,hide] [--why]
 // --speed, --react and --join override the difficulty's chaseSpeedFactor, chaseReactMs and chaseJoinMs
 //         for this run, to try values before putting them in config.ts.
 // --hold adds a third player who just stands still where he was spotted.
@@ -43,8 +43,9 @@ await run(args._[0], async (page) => {
     if (over.spread !== undefined) cfg.searchSpread = over.spread;
     if (over.max !== undefined) cfg.searchAheadMax = over.max;
     if (over.alert !== undefined) cfg.chaseAlertRadius = over.alert;
+    if (over.pursuit !== undefined) cfg.chasePursuitMs = over.pursuit;
     if (over.search !== undefined) cfg.searchMs = over.search;
-    const used = `chase speed ${cfg.chaseSpeedFactor} x Pip, react ${cfg.chaseReactMs} ms, join ${cfg.chaseJoinMs} ms, search ${cfg.searchMs} ms, ahead ${cfg.searchAheadSec} s (max ${cfg.searchAheadMax}), spread ${cfg.searchSpread}`;
+    const used = `chase speed ${cfg.chaseSpeedFactor} x Pip, react ${cfg.chaseReactMs} ms, join ${cfg.chaseJoinMs} ms, pursuit ${cfg.chasePursuitMs} ms, search ${cfg.searchMs} ms, ahead ${cfg.searchAheadSec} s (max ${cfg.searchAheadMax}), spread ${cfg.searchSpread}`;
     let trace = false;
     const lines = [];
     const STEP = 16;
@@ -75,7 +76,7 @@ await run(args._[0], async (page) => {
       let shotSpot = false, shotSearch = false;
       const wasSearching = [];
       let closeCall = false, noticed = false, minHidden = Infinity;
-      let runTo = finish0, path = [], pathAt = -1e9, sawSearch = false, chaseEndedAt = null, peakChasers = 0, meet = null, meetAt = -1e9, pocketAt = -1e9, lostThem = false, pocket = null, atPocket = false;
+      let runTo = finish0, path = [], pathAt = -1e9, sawSearch = false, chaseEndedAt = null, peakChasers = 0, meet = null, meetAt = -1e9, pocketAt = -1e9, fleeAt = -1e9, fleeTarget = null, lostThem = false, pocket = null, atPocket = false;
       const finish = finish0;
       const goTo = (t, gx, gy, push) => {
         if (t - pathAt > 200) { path = nav.findPath(s.player.x, s.player.y, gx, gy); pathAt = t; }
@@ -84,7 +85,7 @@ await run(args._[0], async (page) => {
         const dx = w.x - s.player.x, dy = w.y - s.player.y, d = Math.hypot(dx, dy) || 1;
         s.joystick.vector.set((dx / d) * push, (dy / d) * push);
       };
-      const pathLen = (ax, ay, bx, by) => {
+      const pathLen = (ax, ay, bx, by, avoid = 130) => {
         const p = nav.findPath(ax, ay, bx, by);
         if (!p.length) return Infinity;
         let len = 0, px = ax, py = ay;
@@ -92,7 +93,7 @@ await run(args._[0], async (page) => {
           // A sensible player does not run past an officer who is not already after him to get to cover.
           for (let f = 0; f <= 1; f += 0.1) {
             const x = px + (q.x - px) * f, y = py + (q.y - py) * f;
-            if (s.officers.some((k) => !k.chasing && Math.hypot(k.x - x, k.y - y) < 130)) return Infinity;
+            if (s.officers.some((k) => !k.chasing && !k.searching && Math.hypot(k.x - x, k.y - y) < avoid)) return Infinity;
           }
           len += Math.hypot(q.x - px, q.y - py); px = q.x; py = q.y;
         }
@@ -111,7 +112,42 @@ await run(args._[0], async (page) => {
         }
         return found;
       };
-      if (policy === 'hide') pocket = findPocket(100);
+      // The smart runner's step (also the first half of the hide player): every 300 ms pick the point he can reach
+      // well before the nearest pursuer, out of their sight, not past an officer who is not already after him.
+      const fleeStep = (t) => {
+        // A human fleeing: every 300 ms pick the point he can reach well before the nearest pursuer, out of
+        // their sight, not past an officer who is not already after him; he turns at corners and changes
+        // direction to break sight, and keeps going away from the nearest pursuer.
+        if (t - fleeAt > 300) {
+          fleeAt = t;
+          const pursuers = s.officers.filter((k) => k.chasing || k.searching);
+          let bestScore = -Infinity, best = null;
+          // First keep clear of every officer who is not after him yet (a cone reaches about 230); if that leaves
+          // nowhere to go, only of the ones within 130.
+          for (const avoid of [240, 130]) {
+          if (best) break;
+          if (pursuers.length) {
+            for (let y = s.player.y - 420; y <= s.player.y + 420; y += 50) {
+              for (let x = 30; x <= L.width - 30; x += 50) {
+                if (!nav.isFree(x, y)) continue;
+                const len = pathLen(s.player.x, s.player.y, x, y, avoid);
+                if (!Number.isFinite(len) || len < 60) continue;
+                let margin = Infinity, seen = false;
+                for (const k of pursuers) {
+                  margin = Math.min(margin, Math.hypot(k.x - x, k.y - y) / 1.08);
+                  if (nav.clear(k.x, k.y, x, y)) seen = true;
+                }
+                let score = Math.min(margin - len, 250) - (seen ? 120 : 0) - 0.1 * len;
+                if (fleeTarget && Math.hypot(fleeTarget.x - x, fleeTarget.y - y) < 40) score += 40;
+                if (score > bestScore) { bestScore = score; best = { x, y }; }
+              }
+            }
+          }
+          }
+          fleeTarget = best;
+        }
+        if (fleeTarget) goTo(t, fleeTarget.x, fleeTarget.y, 1); else s.joystick.vector.set(0, 0);
+      };
       // Where to meet the crowd: a point on its route that Pip can reach before it does, at least 150
       // from the spot where he was seen (the officers go there first), by walking distance and speed.
       const meetPoint = (c) => {
@@ -138,6 +174,7 @@ await run(args._[0], async (page) => {
           if (Math.hypot(runTo.x - s.player.x, runTo.y - s.player.y) < 60) runTo = runTo === finish ? L.start : finish;
           goTo(t, runTo.x, runTo.y, 1);
         }
+        else if (policy === 'flee') fleeStep(t);
         else if (policy === 'hold') s.joystick.vector.set(0, 0);
         else {
           const c = s.crowds.find((k) => k.active && k.speed > 0);
@@ -145,10 +182,7 @@ await run(args._[0], async (page) => {
           if (!lostThem && s.officers.some((k) => k.searching)) lostThem = true;
           if (!lostThem) {
             // Cover first; once there without having lost them, he does not stand about but runs on.
-            // Hopping from cover to cover while they still chase; with none to reach he stands still.
-            if (pocket && Math.hypot(pocket.x - s.player.x, pocket.y - s.player.y) < 20) pocket = null;
-            if (!pocket && t - pocketAt > 250) { pocket = findPocket(60); pocketAt = t; }
-            if (pocket) goTo(t, pocket.x, pocket.y, 1); else s.joystick.vector.set(0, 0);
+            fleeStep(t); // flees like the smart runner until they have lost him
           }
           else if (!c) s.joystick.vector.set(0, 0); // no crowd on the street just now: wait
           else if (Math.hypot(c.x - s.player.x, c.y - s.player.y) > 45) {
@@ -197,8 +231,8 @@ await run(args._[0], async (page) => {
       return lines;
     }
     lines.push(used);
-    const policies = hold ? ['run', 'hide', 'hold'] : ['run', 'hide'];
-    const names = { run: 'keeps running in the open', hide: 'breaks sight, then hides in the crowd', hold: 'stands still where spotted' };
+    const policies = (over.only ? String(over.only).split(',') : hold ? ['run', 'flee', 'hide', 'hold'] : ['run', 'flee', 'hide']);
+    const names = { flee: 'smart runner (turns at corners, breaks sight, flees the nearest chaser)', run: 'keeps running in a straight line', hide: 'breaks sight, then hides in the crowd', hold: 'stands still where spotted' };
     for (const p of policies) {
       const rows = [];
       for (let i = 0; i < starts; i++) rows.push(await attempt(p, i * every));
@@ -216,6 +250,6 @@ await run(args._[0], async (page) => {
       if (caught.length) lines.push(`  caught at: ${caught.join(' ')}`);
     }
     return lines;
-  }, [spot, starts, every, !!args.hold, args.trace ?? null, { speed: args.speed, react: args.react, join: args.join, ahead: args.ahead, max: args.max, alert: args.alert, spread: args.spread, search: args.search, why: !!args.why }, args.difficulty ?? 'normal']);
+  }, [spot, starts, every, !!args.hold, args.trace ?? null, { speed: args.speed, react: args.react, join: args.join, ahead: args.ahead, max: args.max, alert: args.alert, pursuit: args.pursuit, only: args.only, spread: args.spread, search: args.search, why: !!args.why }, args.difficulty ?? 'normal']);
   out.forEach((l) => console.log(l));
 });

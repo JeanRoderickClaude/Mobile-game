@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import {
   ASSIST_ANGLE_DEG, ASSIST_BREAK_STRENGTH, ASSIST_FLOOR_FACTOR, ASSIST_PACE_MAX, ASSIST_PACE_MIN, ASSIST_SETTLE_DIST, CHARACTER_SCALE, COIN_PICKUP_RADIUS, DIFFICULTIES, type Difficulty, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
-  CHASE_LOST_MS, NOISE_WALK_FACTOR, OFFICER_RADIUS, POSTER_ZONE, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, RING_INTERVAL_MS, RING_LIFE_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
+  NOISE_WALK_FACTOR, OFFICER_RADIUS, POSTER_ZONE, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, RING_INTERVAL_MS, RING_LIFE_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
 } from '../config';
 import { Bystanders } from '../entities/Bystanders';
 import { Character } from '../entities/Character';
@@ -398,8 +398,8 @@ export class GameScene extends Phaser.Scene {
   /**
    * Chase rule. A full meter sends the officers who see Pip after him; a chasing
    * officer alerts every officer within the difficulty's radius, who join. They all
-   * run to where any chaser last saw Pip. When none sees him for CHASE_LOST_MS they
-   * all go to that spot and search. A searching officer who notices Pip chases again.
+   * run to where any chaser last saw Pip. When none sees him they keep running, at chase
+   * speed, to where he would be had he held his heading and speed, for chasePursuitMs; then they all search. A searching officer who notices Pip chases again.
    * Only a chasing officer touching Pip catches him.
    */
   private updateChase(dt: number, noticing: PoliceOfficer[]): void {
@@ -426,12 +426,28 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.chaseLostMs += dt;
     }
-    for (const o of chasers) o.chaseTo(this.chaseLastX, this.chaseLastY);
-    if (this.chaseLostMs >= CHASE_LOST_MS) {
+    // Sight lost: run to where Pip would be by now on his last heading, not to where he was.
+    const along = Math.min(this.chaseSpeed * (this.chaseLostMs / 1000), this.clearReach(this.chaseSpeed * (cfg.chasePursuitMs / 1000)));
+    const tx = this.chaseLastX + this.chaseDirX * along, ty = this.chaseLastY + this.chaseDirY * along;
+    for (const o of chasers) o.chaseTo(tx, ty);
+    if (this.chaseLostMs >= cfg.chasePursuitMs) {
       this.startSearch(chasers);
       this.chaseLostMs = 0;
     }
     if (chasers.some((o) => Math.hypot(o.x - x, o.y - y) <= PLAYER_RADIUS + OFFICER_RADIUS)) this.end('caught');
+  }
+
+  /** How far (up to max units, in steps of 20) the line from the last seen spot along Pip's heading stays clear of walls. */
+  private clearReach(max: number): number {
+    const nav = PoliceOfficer.nav;
+    if (!nav) return max;
+    let len = 0;
+    for (let d = 20; d <= max; d += 20) {
+      const px = this.chaseLastX + this.chaseDirX * d, py = this.chaseLastY + this.chaseDirY * d;
+      if (!nav.isFree(px, py) || !nav.clear(this.chaseLastX, this.chaseLastY, px, py)) break;
+      len = d;
+    }
+    return len;
   }
 
   /** A chaser sees Pip now: remember where, which way he was heading and how fast. */
@@ -456,14 +472,7 @@ export class GameScene extends Phaser.Scene {
     const x0 = this.chaseLastX, y0 = this.chaseLastY;
     const free = (x: number, y: number) => !nav || nav.isFree(x, y);
     const reach = Math.min(cfg.searchAheadMax, this.chaseSpeed * cfg.searchAheadSec);
-    let len = 0;
-    if (reach >= 40) {
-      for (let d = 20; d <= reach; d += 20) {
-        const px = x0 + this.chaseDirX * d, py = y0 + this.chaseDirY * d;
-        if (!free(px, py) || (nav && !nav.clear(x0, y0, px, py))) break;
-        len = d;
-      }
-    }
+    const len = reach >= 40 ? this.clearReach(reach) : 0;
     const pts: Point[] = [];
     const at = (d: number, side: number): void => {
       const px = x0 + this.chaseDirX * d - this.chaseDirY * side, py = y0 + this.chaseDirY * d + this.chaseDirX * side;
