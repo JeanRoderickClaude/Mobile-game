@@ -403,6 +403,7 @@ export class GameScene extends Phaser.Scene {
   /** Posters and tags: progress at the spot Pip stands on, and what a finished one does. */
   private updateSpots(dt: number): void {
     const done = this.spots.update(dt, this.player.x, this.player.y, this.playerSpeed);
+    this.spots.drawGuides(this.cameras.main.worldView, this.player.x, this.player.y, this.time.now);
     if (!done) return;
     if (done.kind === 'poster') {
       const posters = this.level.posters!;
