@@ -216,8 +216,8 @@ export class GameScene extends Phaser.Scene {
       dx /= len;
       dy /= len;
       keyboard = true;
-      // X breaks cover; so does Space where Space is not the trumpet.
-      sprint = k.x.isDown || (!this.level.trumpet && k.space.isDown);
+      // X breaks cover in every chapter; Space only ever plays the trumpet.
+      sprint = k.x.isDown;
     } else {
       dx = this.joystick.vector.x;
       dy = this.joystick.vector.y;
@@ -237,8 +237,7 @@ export class GameScene extends Phaser.Scene {
       dx *= cap / wanted;
       dy *= cap / wanted;
     }
-    const breakKey = this.level.trumpet ? 'X' : 'Space';
-    this.assistHint.setText(this.assisting ? (keyboard ? `Hold ${breakKey} to break cover` : 'Push to the edge to break cover') : '');
+    this.assistHint.setText(this.assisting ? (keyboard ? 'Hold X to break cover' : 'Push to the edge to break cover') : '');
 
     const step = (PLAYER_SPEED * dt) / 1000;
     const fromX = this.player.x;

@@ -1,4 +1,4 @@
-import { DEFAULT_DIFFICULTY, DIFFICULTIES, type Difficulty } from '../config';
+import { DEFAULT_DIFFICULTY, DIFFICULTIES, LEGACY_DIFFICULTY, type Difficulty } from '../config';
 import { DEFAULT_ITEMS, DEFAULT_LOOK, isKnownItem, type PlayerLook } from '../entities/cosmetics';
 import { itemById, type ItemCategory, type ShopItem } from '../data/items';
 import { isFlagValue, type FlagValue, type Flags } from '../story/flags';
@@ -18,7 +18,7 @@ export interface SaveData {
   /** Ids of bought shop items. Default items are always owned and not listed. */
   owned: string[];
   equipped: Record<ItemCategory, string>;
-  /** Saves from before difficulties existed load as DEFAULT_DIFFICULTY. */
+  /** New saves start on DEFAULT_DIFFICULTY; saves from before difficulties existed load as LEGACY_DIFFICULTY. */
   difficulty: Difficulty;
   /** Ids of finished chapters (see src/story/chapters.json). */
   completed: string[];
@@ -75,7 +75,7 @@ function sanitize(input: unknown): SaveData {
       if (typeof id === 'string' && isKnownItem(category, id) && ownsIn(out, category, id)) out.equipped[category] = id;
     }
   }
-  if (typeof data.difficulty === 'string' && Object.hasOwn(DIFFICULTIES, data.difficulty)) out.difficulty = data.difficulty;
+  out.difficulty = typeof data.difficulty === 'string' && Object.hasOwn(DIFFICULTIES, data.difficulty) ? data.difficulty : LEGACY_DIFFICULTY;
   if (Array.isArray(data.completed)) out.completed = [...new Set(data.completed.filter((id) => typeof id === 'string'))];
   if (data.flags && typeof data.flags === 'object' && !Array.isArray(data.flags)) {
     for (const [name, value] of Object.entries(data.flags)) if (isFlagValue(value)) out.flags[name] = value;

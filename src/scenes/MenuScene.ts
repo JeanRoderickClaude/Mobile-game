@@ -37,7 +37,7 @@ export class MenuScene extends Phaser.Scene {
     kb.once('keydown-L', () => this.scene.start('locker'));
   }
 
-  /** Segmented Easy / Normal switch. The choice is saved at once. */
+  /** Segmented Relaxed / Normal switch with a line explaining them. The choice is saved at once. */
   private buildDifficultyPicker(cx: number, y: number): void {
     this.add.text(cx, y - 46, 'Difficulty', { fontFamily: FONT, fontSize: '20px', color: '#b5b7c0' }).setOrigin(0.5);
     const keys = Object.keys(DIFFICULTIES) as Difficulty[];
@@ -60,5 +60,7 @@ export class MenuScene extends Phaser.Scene {
       }
     };
     refresh();
+    const note = { fontFamily: FONT, fontSize: '18px', color: '#b5b7c0', align: 'center' };
+    this.add.text(cx, y + 52, 'Normal is the intended experience.\nRelaxed is more forgiving.', note).setOrigin(0.5);
   }
 }

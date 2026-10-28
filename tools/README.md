@@ -22,7 +22,7 @@ node tools/ride.mjs src/levels/level-01.json
 
 Flags go after the level file. A script that runs the whole level many times takes a minute or two.
 
-Every script takes `--difficulty easy` or `--difficulty normal` (default normal). It sets the catch time and cone length the same way the game does, and the first output line says which one ran. Running several scripts at once slows the machine and can shift results by a few ms; run them one at a time for exact numbers.
+Every script takes `--difficulty easy` (shown to players as Relaxed) or `--difficulty normal` (default normal). It sets the catch time and cone length the same way the game does, and the first output line says which one ran. Running several scripts at once slows the machine and can shift results by a few ms; run them one at a time for exact numbers.
 
 ## ride.mjs: is riding a crowd safe?
 

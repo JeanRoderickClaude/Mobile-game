@@ -30,9 +30,10 @@ export interface DifficultyConfig {
   alertRadius: number;
 }
 
+// The "easy" key is kept so existing saves still load; players see it as Relaxed.
 export const DIFFICULTIES = {
   easy: {
-    label: 'Easy', catchTimeMs: 1500, visionRangeFactor: 0.8,
+    label: 'Relaxed', catchTimeMs: 1500, visionRangeFactor: 0.8,
     hearingRadius: 230, noiseRisePerSec: 1 / 7, noiseFallPerSec: 1 / 4, lingerMs: 5500, alertRadius: 380,
   },
   normal: {
@@ -42,7 +43,10 @@ export const DIFFICULTIES = {
 } satisfies Record<string, DifficultyConfig>;
 
 export type Difficulty = keyof typeof DIFFICULTIES;
-export const DEFAULT_DIFFICULTY: Difficulty = 'easy';
+/** New saves start here. */
+export const DEFAULT_DIFFICULTY: Difficulty = 'normal';
+/** Saves made before difficulties existed were played on Relaxed, so they keep it. */
+export const LEGACY_DIFFICULTY: Difficulty = 'easy';
 // When out of sight, the suspicion meter drains at this multiple of the fill rate.
 export const SUSPICION_DECAY = 2;
 
