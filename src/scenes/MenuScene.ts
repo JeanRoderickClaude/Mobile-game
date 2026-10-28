@@ -31,8 +31,8 @@ export class MenuScene extends Phaser.Scene {
     makeButton(this, cx, 685, 'Play', play, 280, 70);
     makeButton(this, cx, 770, 'Locker', () => this.scene.start('locker'), 280, 70);
     this.buildDifficultyPicker(cx, 880);
-    // Development builds only: a practice level for the chase and search system.
-    if (import.meta.env.DEV && PRACTICE_LEVEL_INDEX >= 0) {
+    // A practice level for the chase and search system; hidden by the build setting VITE_PRACTICE_LEVEL=off.
+    if (PRACTICE_LEVEL_INDEX >= 0) {
       makeButton(this, GAME_WIDTH - 72, 36, 'Practice', () => this.scene.start('game', { levelIndex: PRACTICE_LEVEL_INDEX }), 124, 44);
     }
 
