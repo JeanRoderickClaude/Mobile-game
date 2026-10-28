@@ -24,6 +24,7 @@ export function resolveLevel(level: LevelData, flags: Flags): ResolvedLevel {
     officers: keep(level.officers).map((o) => ({ ...o, visionRange: o.visionRange * vision, speed: o.speed * officerSpeed })),
     crowds: keep(level.crowds).map((c) => ({ ...c, size: Math.max(1, Math.round(c.size * crowdSize)) })),
     coins: keep(level.coins),
+    bystanders: keep(level.bystanders),
     catchTimeFactor: catchTime,
   };
 }

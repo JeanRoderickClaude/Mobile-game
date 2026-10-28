@@ -1,9 +1,13 @@
 import Phaser from 'phaser';
-import { CHARACTER_SCALE, COLORS, OFFICER_TURN_SPEED, VISION_RAYS } from '../config';
+import { ALERT_LOOK_MS, ALERT_SPEED_FACTOR, CHARACTER_SCALE, COLORS, OFFICER_TURN_SPEED, VISION_RAYS } from '../config';
 import type { OfficerData, Rect } from '../levels/types';
 import { angleDiff, castRay, hasLineOfSight } from '../systems/geometry';
 
-/** A police officer walking a fixed patrol route with a vision cone. */
+/**
+ * A police officer walking a fixed patrol route with a vision cone. When
+ * called by noise (investigate), they leave the route, walk to the spot,
+ * look around for ALERT_LOOK_MS and walk back to where they left it.
+ */
 export class PoliceOfficer {
   readonly data: OfficerData;
   x: number;
@@ -16,6 +20,14 @@ export class PoliceOfficer {
   private direction = 1; // +1 forward, -1 backward (pingpong only)
   private pauseLeft = 0;
   private halfAngle: number;
+  private alert: 'none' | 'going' | 'looking' | 'returning' = 'none';
+  private alertX = 0;
+  private alertY = 0;
+  private homeX = 0; // where the officer left the patrol route
+  private homeY = 0;
+  private lookLeft = 0;
+  private lookBase = 0;
+  private alertMark: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene, data: OfficerData) {
     this.data = data;
@@ -28,11 +40,37 @@ export class PoliceOfficer {
 
     this.cone = scene.add.graphics().setDepth(5);
     this.sprite = this.buildSprite(scene).setDepth(20);
+    this.alertMark = scene.add
+      .text(0, 0, '?', { fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '26px', color: '#ffd23f', stroke: '#000', strokeThickness: 5 })
+      .setOrigin(0.5)
+      .setDepth(42)
+      .setVisible(false);
     this.syncSprite();
+  }
+
+  /** True while walking to a noise, looking around, or walking back. */
+  get alerted(): boolean {
+    return this.alert !== 'none';
+  }
+
+  /** Walk to (x, y) and look around there. A new call while alerted moves the spot. */
+  investigate(x: number, y: number): void {
+    if (this.alert === 'none') {
+      this.homeX = this.x;
+      this.homeY = this.y;
+    }
+    this.alert = 'going';
+    this.alertX = x;
+    this.alertY = y;
   }
 
   update(deltaMs: number): void {
     const dt = deltaMs / 1000;
+    if (this.alert !== 'none') {
+      this.updateAlert(deltaMs);
+      this.syncSprite();
+      return;
+    }
     const patrol = this.data.patrol;
     if (patrol.length < 2) return;
 
@@ -65,6 +103,45 @@ export class PoliceOfficer {
       this.facing += Phaser.Math.Clamp(diff, -maxTurn, maxTurn);
     }
     this.syncSprite();
+  }
+
+  private updateAlert(deltaMs: number): void {
+    const dt = deltaMs / 1000;
+    if (this.alert === 'looking') {
+      // Sweep the cone left and right around the direction they arrived from.
+      this.lookLeft -= deltaMs;
+      const t = 1 - this.lookLeft / ALERT_LOOK_MS;
+      this.facing = this.lookBase + Math.sin(t * Math.PI * 3) * 1.2;
+      if (this.lookLeft <= 0) this.alert = 'returning';
+      return;
+    }
+    const going = this.alert === 'going';
+    const gx = going ? this.alertX : this.homeX;
+    const gy = going ? this.alertY : this.homeY;
+    const dx = gx - this.x;
+    const dy = gy - this.y;
+    const dist = Math.hypot(dx, dy);
+    const step = this.data.speed * (going ? ALERT_SPEED_FACTOR : 1) * dt;
+    if (dist > 0) {
+      const diff = angleDiff(Math.atan2(dy, dx), this.facing);
+      const maxTurn = OFFICER_TURN_SPEED * 1.5 * dt;
+      this.facing += Phaser.Math.Clamp(diff, -maxTurn, maxTurn);
+    }
+    if (dist > step) {
+      this.x += (dx / dist) * step;
+      this.y += (dy / dist) * step;
+      return;
+    }
+    this.x = gx;
+    this.y = gy;
+    if (going) {
+      this.alert = 'looking';
+      this.lookLeft = ALERT_LOOK_MS;
+      this.lookBase = this.facing;
+    } else {
+      this.alert = 'none';
+      this.pauseLeft = 0;
+    }
   }
 
   /** True when the point is inside the vision cone and nothing blocks the view. */
@@ -137,5 +214,6 @@ export class PoliceOfficer {
   private syncSprite(): void {
     this.sprite.setPosition(this.x, this.y);
     this.sprite.rotation = this.facing + Math.PI / 2;
+    this.alertMark.setVisible(this.alert === 'going' || this.alert === 'looking').setPosition(this.x, this.y - 34);
   }
 }

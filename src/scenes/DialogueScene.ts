@@ -307,6 +307,24 @@ function drawStage(g: Phaser.GameObjects.Graphics, stage: StageName): void {
     g.fillStyle(0x8d8f99, 1).fillRect(0, 392, w, STAGE_H - 392); // pavement
     g.fillStyle(0x767884, 1).fillRect(0, 392, w, 6);
     for (let x = 0; x < w; x += 90) g.fillRect(x, 398, 3, STAGE_H - 398);
+  } else if (stage === 'harbor') {
+    g.fillStyle(0x5d6f86, 1).fillRect(0, 0, w, STAGE_H); // evening fog
+    g.fillStyle(0x76879c, 1).fillRect(0, 170, w, 120);
+    // Lighthouse on the far pier, its beam, and boats on the water.
+    g.fillStyle(0x3e4c5e, 1).fillRect(40, 300, 150, 12).fillTriangle(80, 300, 110, 300, 100, 150).fillRect(88, 140, 16, 14);
+    g.fillStyle(0xffe08a, 0.9).fillCircle(96, 147, 6);
+    g.fillStyle(0xffe08a, 0.12).fillTriangle(96, 147, 300, 110, 300, 190);
+    g.fillStyle(0x2f6f9a, 1).fillRect(0, 300, w, 92); // water
+    g.fillStyle(0xffffff, 0.15);
+    for (let y = 315; y < 385; y += 22) for (let x = (y % 44) - 10; x < w; x += 70) g.fillRoundedRect(x, y, 26, 3, 1.5);
+    g.fillStyle(0x2a3442, 1);
+    g.fillTriangle(250, 330, 390, 330, 370, 352).fillRect(250, 318, 140, 12).fillRect(300, 250, 5, 70); // fishing boat
+    g.fillTriangle(305, 255, 305, 310, 350, 310);
+    g.fillTriangle(420, 345, 520, 345, 505, 362).fillRect(420, 336, 100, 9); // rowing boat
+    g.fillStyle(0x6b4f35, 1).fillRect(0, 392, w, STAGE_H - 392); // wooden quay
+    g.fillStyle(0x5a4230, 1);
+    for (let x = 0; x < w; x += 36) g.fillRect(x, 392, 3, STAGE_H - 392);
+    g.fillStyle(0x2a2a2a, 1).fillRoundedRect(28, 372, 22, 26, 6).fillRoundedRect(498, 372, 22, 26, 6); // bollards
   } else {
     g.fillStyle(0x3a1f1a, 1).fillRect(0, 0, w, STAGE_H); // brick wall
     g.fillStyle(0x4a2a22, 1);

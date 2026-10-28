@@ -17,7 +17,7 @@ Mostly light and satirical, with a few serious moments.
 ## Chapters
 
 1. Last Song. Pip busks on a corner when the Quiet Squad arrives and must slip away through the crowd. This is the current level 1. It teaches cones, crowds and coins.
-2. Strike Up. Pip meets Ma Ruby, owner of the Brass Cellar venue. New mechanic: playing the trumpet draws nearby people into a crowd around Pip, but raises a noise meter that pulls police toward Pip.
+2. Strike Up. Pip meets Ma Ruby, owner of the Brass Cellar venue. New mechanic: playing the trumpet draws nearby people into a crowd around Pip, but raises a noise meter that pulls police toward Pip. Built as level 2, "Harbor Quay": a quiet quay to try the trumpet, a stretch of fish stalls, then a guarded square in front of the old fish auction with no marching crowds. Locals gather while Pip plays, stay with him a few seconds after he stops, then drift home; a full noise meter sends nearby officers to look where Pip was. Intro on the foggy harbor with Gus (who explains it in fishmonger terms) and Officer Mute; outro in the Brass Cellar, where Ruby introduces herself and asks Pip to put up posters for a secret concert, setting up chapter 3.
 3. Night Posters. A night level with shorter vision for everyone. Plant posters for a secret concert at set spots. Choice: tag a Quiet Squad van for bonus coins. Tagging makes police start chapter 4 more alert.
 4. The Raid. Police storm the Brass Cellar. New mechanic: police chase and search the last seen spot. Serious beat. Choice: help Ruby carry her instruments out (slower, riskier) or run. If Pip runs, Ruby does not appear later.
 5. Drummer Boy. Escort Teun, a loud drummer who hides poorly, to a secret rehearsal space. New mechanic: an ally who follows the player and needs cover. Teun is arrested at the end.
@@ -35,8 +35,9 @@ Mostly light and satirical, with a few serious moments.
 - Pip: the player. Shy and hesitant out loud, dry and funny inside. Plays Grandad's old trumpet.
 - Sergeant Hush: leads the Quiet Squad. Quotes the Silence Act by section and subsection.
 - Officer Mute: Hush's partner. Reads the decibel meter aloud with great ceremony.
-- Gus: fishmonger on Main Street, Pip's most loyal listener. His haddock love the sad song.
-- Ma Ruby: owner of the Brass Cellar, a hidden venue under the old fish auction (door with no handle; knock twice, hum a B-flat). Long red coat, rings shaped like brass horns. Appears as "Stranger" at the end of chapter 1.
+- Gus: fishmonger on Main Street, Pip's most loyal listener. His haddock love the sad song. Fined forty coins after chapter 1 and took it cheerfully.
+- Ma Ruby: owner of the Brass Cellar, a hidden venue under the old fish auction (door with no handle; knock twice, hum a B-flat), open thirty years. Long red coat, rings shaped like brass horns. Appears as "Stranger" at the end of chapter 1 and introduces herself in chapter 2. Warm and blunt: "Down here, loud is polite." Planning a secret concert.
+- Old Jonas: an accordion player who sold his accordion because of the fines (mentioned by Ruby in chapter 2).
 - Mayor Prudence Quill: heard over loudspeakers so far. Announces the joys of silence at full volume.
 - Teun, the mayor's aide, the brother-in-law: not written yet.
 
@@ -54,7 +55,7 @@ Quiet Squad humor. The officers are never cruel and never stupid. They are funny
 
 Light and serious. Most lines are light. Each scene gets one or two serious beats that show the real cost: a fine for a friend, a lost instrument, someone arrested. Play those beats straight, with no joke in the same line, and let the next line lift the mood again. Chapters 4 and 5 lean more serious than the rest, as the outline says.
 
-Staging. Put on stage only the characters who are physically present; voices from loudspeakers or radios speak from off stage, which dims everyone. Bring a character on with "enter" on the line where the story says they arrive, usually a narration line describing it, and take them off the same way. Keep Pip leftmost and at most four characters on stage at once. Use the street backdrop for outdoor scenes and the cellar for the Brass Cellar.
+Staging. Put on stage only the characters who are physically present; voices from loudspeakers or radios speak from off stage, which dims everyone. Bring a character on with "enter" on the line where the story says they arrive, usually a narration line describing it, and take them off the same way. Keep Pip leftmost and at most four characters on stage at once. Backdrops: street for town scenes, harbor for the quay, cellar for the Brass Cellar.
 
 Mechanics in dialogue. When a chapter teaches something, a character says it in the world's terms (stay in the crowd, stay out of their sight lines, pick up your tips), never in button names.
 

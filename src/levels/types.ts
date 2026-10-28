@@ -21,6 +21,8 @@ export interface Obstacle extends Rect, Conditional {
   type: 'building' | 'car';
   /** Optional hex colour such as "#c96f53". A palette colour is picked when left out. */
   color?: string;
+  /** Optional drawing style for buildings. "water" draws a harbor basin; it still blocks like a building, so keep it at the level edge. */
+  style?: 'water';
 }
 
 export interface OfficerData extends Conditional {
@@ -64,6 +66,12 @@ export interface StandingCrowdData extends CrowdBase {
 
 export type CrowdData = MarchingCrowdData | StandingCrowdData;
 
+/** An idle local who wanders near a spot and comes to listen when Pip plays the trumpet. */
+export interface BystanderData extends Point, Conditional {
+  /** How far from the spot they stroll while idle. Default 25. */
+  wander?: number;
+}
+
 /** A coin lying on the street. Collected by walking over it. */
 export interface CoinData extends Point, Conditional {
   /** Coins added to the run when picked up. Default COIN_VALUE (5). Higher values draw as valuable coins. */
@@ -100,6 +108,12 @@ export interface LevelData {
   crowds?: CrowdData[];
   /** Optional. Coins to pick up during a run. */
   coins?: CoinData[];
+  /** Optional. Pip can play the trumpet (Space or the on-screen button). Default false. */
+  trumpet?: boolean;
+  /** Optional. Locals who gather around Pip while he plays. */
+  bystanders?: BystanderData[];
+  /** Optional. Text drawn in the finish zone. Default "FINISH". */
+  finishLabel?: string;
   /** Optional. Finish time in seconds that earns the full speed bonus. Default: height / PLAYER_SPEED x PAR_TIME_FACTOR. */
   parTimeSec?: number;
   /** Optional. Story-flag dependent tuning, applied by resolveLevel. */

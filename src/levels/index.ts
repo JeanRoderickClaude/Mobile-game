@@ -42,7 +42,17 @@ function validate(level: LevelData, path: string): LevelData {
     if (c.value !== undefined && !(Number.isInteger(c.value) && c.value > 0)) fail(`coin ${i} "value" must be a positive whole number`);
   });
   if (level.parTimeSec !== undefined && !(level.parTimeSec > 0)) fail('"parTimeSec" must be positive');
-  const lists = { obstacle: level.obstacles, officer: level.officers, crowd: level.crowds, coin: level.coins };
+  level.bystanders ??= [];
+  if (!Array.isArray(level.bystanders)) fail('"bystanders" must be an array');
+  level.bystanders.forEach((b, i) => {
+    if (typeof b.x !== 'number' || typeof b.y !== 'number') fail(`bystander ${i} needs "x" and "y"`);
+    if (b.wander !== undefined && !(b.wander >= 0)) fail(`bystander ${i} "wander" must be 0 or more`);
+  });
+  if (level.bystanders.length > 0 && !level.trumpet) fail('"bystanders" only come when Pip plays; set "trumpet": true');
+  level.obstacles.forEach((o, i) => {
+    if (o.style !== undefined && !(o.style === 'water' && o.type === 'building')) fail(`obstacle ${i} "style" can only be "water", on a building`);
+  });
+  const lists = { obstacle: level.obstacles, officer: level.officers, crowd: level.crowds, coin: level.coins, bystander: level.bystanders };
   for (const [what, list] of Object.entries(lists)) {
     list.forEach((e, i) => e.if !== undefined && checkFlagMap(e.if, fail, `${what} ${i} "if"`));
   }

@@ -102,6 +102,22 @@ node tools/coverage.mjs src/levels/level-01.json coverage.png
 
 Green pockets behind cars and buildings are where a solo player waits. A route with no green near it can only be crossed by timing.
 
+## trumpet.mjs: does the trumpet carry a guarded stretch?
+
+For levels with the trumpet. Starts at a point before the guarded stretch (`--from x,y`, default 270,1330, level 2's square edge) and follows a route of points (`--route "x,y;x,y"`) to the finish, from 20 start times (`--starts N`, `--every ms`). Three ways across:
+
+- alone, full speed, no trumpet: blind, like blind.mjs.
+- gather, then move in the linger time: plays standing still until 5 bystanders have gathered (at most 3 s), then walks at a three-quarter push (the crowd pace assist keeps it at the group's pace). It plays again, while walking, only when fewer than 3 are gathered or the linger time is under 0.9 s, and never above 70 percent noise. It does not watch the cones.
+- play nonstop while crossing: gathers the same way, then never stops playing.
+
+Each gives survivals, average time and coins of the survivors, how many runs called officers, and `caught at` positions for the failures. Then, for each point in `--spots "x,y;x,y"`, it holds the trumpet standing still until the meter fills (with catching switched off), then waits 30 s, 10 start times each, and reports how long the meter took, in how many runs officers were called and reached the spot, and in how many they were all back on patrol.
+
+```
+node tools/trumpet.mjs src/levels/level-02.json --route "360,900;360,650;270,450;270,40"
+```
+
+Want: alone rarely survives, gather usually survives, nonstop calls officers nearly every run, and the level's practice spot calls nobody.
+
 ## Balancing workflow
 
 Edit the level JSON, then run ride.mjs (crowds safe), blind.mjs (solo risky), stand.mjs (standing groups useful), solve.mjs (solo still possible) and coins.mjs (route coins safe, valuable coins risky). When a crowd ride fails, look at the officer with the longest sighting. Officers walking the same direction as a crowd, just behind it, are the usual cause; crosswise sweeps with narrow cones are kinder to crowds.

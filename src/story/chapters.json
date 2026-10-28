@@ -1,6 +1,6 @@
 [
   { "id": "ch1", "title": "Last Song", "level": "level-01", "intro": "ch1-intro", "outro": "ch1-outro" },
-  { "id": "ch2", "title": "Strike Up" },
+  { "id": "ch2", "title": "Strike Up", "level": "level-02", "intro": "ch2-intro", "outro": "ch2-outro" },
   { "id": "ch3", "title": "Night Posters" },
   { "id": "ch4", "title": "The Raid" },
   { "id": "ch5", "title": "Drummer Boy" },

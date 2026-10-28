@@ -18,11 +18,27 @@ export interface DifficultyConfig {
   catchTimeMs: number;
   /** Multiplies every officer's visionRange (cone length). */
   visionRangeFactor: number;
+  /** Trumpet: bystanders within this distance of Pip come and gather while he plays. */
+  hearingRadius: number;
+  /** Trumpet: noise meter gained per second of playing (1 = full). */
+  noiseRisePerSec: number;
+  /** Trumpet: noise meter lost per second of silence. */
+  noiseFallPerSec: number;
+  /** Trumpet: how long gathered bystanders stay with Pip after the music stops. */
+  lingerMs: number;
+  /** Trumpet: when the noise meter fills, officers within this distance come to look. */
+  alertRadius: number;
 }
 
 export const DIFFICULTIES = {
-  easy: { label: 'Easy', catchTimeMs: 1500, visionRangeFactor: 0.8 },
-  normal: { label: 'Normal', catchTimeMs: 500, visionRangeFactor: 1 },
+  easy: {
+    label: 'Easy', catchTimeMs: 1500, visionRangeFactor: 0.8,
+    hearingRadius: 230, noiseRisePerSec: 1 / 7, noiseFallPerSec: 1 / 4, lingerMs: 5500, alertRadius: 380,
+  },
+  normal: {
+    label: 'Normal', catchTimeMs: 500, visionRangeFactor: 1,
+    hearingRadius: 190, noiseRisePerSec: 1 / 4.5, noiseFallPerSec: 1 / 7, lingerMs: 4000, alertRadius: 520,
+  },
 } satisfies Record<string, DifficultyConfig>;
 
 export type Difficulty = keyof typeof DIFFICULTIES;
@@ -56,6 +72,18 @@ export const ASSIST_PACE_MIN = 0.85;
 export const ASSIST_PACE_MAX = 1.08;
 export const ASSIST_FLOOR_FACTOR = 0.95;
 export const ASSIST_BREAK_STRENGTH = 0.95;
+
+// Trumpet and bystanders (the per-difficulty values live in DIFFICULTIES).
+export const TRUMPET_SPEED_FACTOR = 0.5; // Pip walks at this fraction of top speed while playing
+export const BYSTANDER_WANDER_SPEED = 18; // idle stroll around the home spot
+export const BYSTANDER_FOLLOW_SPEED = 100; // walking to Pip and keeping up with him
+export const BYSTANDER_RETURN_SPEED = 45; // drifting home after the linger time
+export const GATHER_RING = 44; // gathered bystanders stand about this far from Pip
+export const GATHER_DISTANCE = 70; // a drawn bystander counts as gathered within this distance of Pip
+export const GATHER_MIN = 3; // gathered bystanders needed before they hide Pip
+export const RING_INTERVAL_MS = 380; // a new sound ring leaves Pip this often while playing
+export const ALERT_SPEED_FACTOR = 1.6; // officers walk to the noise at this multiple of their patrol speed
+export const ALERT_LOOK_MS = 3500; // and look around there this long before going back
 
 // Coins and the finish bonus.
 export const COIN_VALUE = 5; // value of a coin whose level entry has no "value"

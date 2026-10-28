@@ -16,7 +16,8 @@ export class VirtualJoystick {
   private originY = 0;
   private readonly radius = 60;
 
-  constructor(private scene: Phaser.Scene) {
+  /** ignore: pointers it returns true for (an on-screen button) never start the stick. */
+  constructor(private scene: Phaser.Scene, private ignore: (p: Phaser.Input.Pointer) => boolean = () => false) {
     this.base = scene.add.circle(0, 0, this.radius, 0xffffff, 0.15).setStrokeStyle(3, 0xffffff, 0.5);
     this.thumb = scene.add.circle(0, 0, 26, 0xffffff, 0.5);
     for (const o of [this.base, this.thumb]) o.setScrollFactor(0).setDepth(100).setVisible(false);
@@ -29,7 +30,7 @@ export class VirtualJoystick {
   }
 
   private onDown(p: Phaser.Input.Pointer): void {
-    if (this.pointerId !== null) return;
+    if (this.ignore(p) || this.pointerId !== null) return;
     this.pointerId = p.id;
     this.originX = p.x;
     this.originY = p.y;

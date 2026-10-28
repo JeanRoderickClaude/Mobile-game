@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import {
   ASSIST_ANGLE_DEG, ASSIST_BREAK_STRENGTH, ASSIST_FLOOR_FACTOR, ASSIST_PACE_MAX, ASSIST_PACE_MIN, ASSIST_SETTLE_DIST, CHARACTER_SCALE, COIN_PICKUP_RADIUS, DIFFICULTIES, type Difficulty, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
-  PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR,
+  PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, BYSTANDER_FOLLOW_SPEED, RING_INTERVAL_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
 } from '../config';
+import { Bystanders } from '../entities/Bystanders';
 import { Character } from '../entities/Character';
 import { Coin } from '../entities/Coin';
 import { Crowd } from '../entities/Crowd';
@@ -13,7 +14,7 @@ import type { Obstacle, Rect, ResolvedLevel } from '../levels/types';
 import type { Flags } from '../story/flags';
 import { CHAPTERS, isPlayable, pickScene } from '../story/story';
 import { finishBonus } from '../systems/economy';
-import { overlaps } from '../systems/geometry';
+import { hasLineOfSight, overlaps } from '../systems/geometry';
 import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags } from '../systems/save';
 import { playCoin } from '../systems/sfx';
 import { VirtualJoystick } from '../systems/VirtualJoystick';
@@ -43,7 +44,21 @@ export class GameScene extends Phaser.Scene {
   private coinLabel!: CoinLabel;
   private blockers: Rect[] = [];
   private joystick!: VirtualJoystick;
-  private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift' | 'sprint', Phaser.Input.Keyboard.Key>;
+  private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift' | 'space' | 'x', Phaser.Input.Keyboard.Key>;
+  private bystanders!: Bystanders;
+  /** Trumpet: playing this frame, the noise meter (0..1) and the sound rings in flight. */
+  private playing = false;
+  private noise = 0;
+  private ringClock = 0;
+  private rings: { x: number; y: number; age: number }[] = [];
+  private ringGfx!: Phaser.GameObjects.Graphics;
+  private noiseBar!: Phaser.GameObjects.Graphics;
+  private trumpetPointer: number | null = null; // touch on the on-screen trumpet button
+  private trumpetButton: Phaser.GameObjects.Container | null = null;
+  /** Set by the balance tools to play without a key or touch. */
+  trumpetOverride = false;
+  /** Obstacles grown by an officer's half-size, for checking who can walk straight to a noise. */
+  private walkBlockers: Rect[] = [];
   private difficulty: Difficulty = 'normal';
   private catchTimeMs = 500;
   private suspicion = 0; // ms of accumulated sight, caught at catchTimeMs
@@ -76,6 +91,14 @@ export class GameScene extends Phaser.Scene {
     this.playerSpeed = 0;
     this.hidden = false;
     this.blockers = this.level.obstacles;
+    this.walkBlockers = this.blockers.map((b) => ({ x: b.x - 14, y: b.y - 14, width: b.width + 28, height: b.height + 28 }));
+    this.playing = false;
+    this.noise = 0;
+    this.ringClock = 0;
+    this.rings = [];
+    this.trumpetPointer = null;
+    this.trumpetButton = null;
+    this.trumpetOverride = false;
     this.suspicion = 0;
     this.elapsedMs = 0;
     this.finished = false;
@@ -98,6 +121,9 @@ export class GameScene extends Phaser.Scene {
 
     this.coins = (this.level.coins ?? []).map((d) => new Coin(this, d));
 
+    this.bystanders = new Bystanders(this, this.level.bystanders ?? [], this.blockers);
+    this.ringGfx = this.add.graphics().setDepth(6);
+
     this.player = new Character(this, this.level.start.x, this.level.start.y, equippedLook(), { marker: true }).setDepth(30);
     this.cameras.main.startFollow(this.player, true, 1, 0.15);
 
@@ -107,9 +133,10 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard!;
     const K = Phaser.Input.Keyboard.KeyCodes;
     this.keys = kb.addKeys({
-      up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D, shift: K.SHIFT, sprint: K.SPACE,
+      up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D, shift: K.SHIFT, space: K.SPACE, x: K.X,
     }) as typeof this.keys;
-    this.joystick = new VirtualJoystick(this);
+    if (this.level.trumpet && this.sys.game.device.input.touch) this.buildTrumpetButton();
+    this.joystick = new VirtualJoystick(this, (p) => this.onTrumpetButton(p));
 
     this.timerText = this.add
       .text(16, 14, '', { fontFamily: 'Arial, sans-serif', fontSize: '26px', color: COLORS.text, stroke: '#000', strokeThickness: 4 })
@@ -127,6 +154,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(90);
     this.coinLabel = new CoinLabel(this, 16, 64, 0).setScrollFactor(0).setDepth(90);
+    if (this.level.trumpet) this.buildNoiseMeter();
     this.assistHint = this.add
       .text(GAME_WIDTH / 2, 925, '', { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#7be08f', stroke: '#000', strokeThickness: 3 })
       .setOrigin(0.5)
@@ -141,10 +169,13 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(delta, 50);
     this.elapsedMs += dt;
 
+    this.updateTrumpet(dt);
     this.movePlayer(dt);
     this.collectCoins();
     for (const o of this.officers) o.update(dt);
     for (const c of this.crowds) c.update(dt);
+    const cfg = DIFFICULTIES[this.difficulty];
+    this.bystanders.update(dt, this.player.x, this.player.y, this.playing, cfg.hearingRadius, cfg.lingerMs);
     this.updateDetection(dt);
 
     this.timerText.setText(formatTime(this.elapsedMs));
@@ -168,7 +199,8 @@ export class GameScene extends Phaser.Scene {
       dx /= len;
       dy /= len;
       keyboard = true;
-      sprint = k.sprint.isDown;
+      // X breaks cover; so does Space where Space is not the trumpet.
+      sprint = k.x.isDown || (!this.level.trumpet && k.space.isDown);
     } else {
       dx = this.joystick.vector.x;
       dy = this.joystick.vector.y;
@@ -177,6 +209,10 @@ export class GameScene extends Phaser.Scene {
 
     // Crowd pace assist: slow to the group's pace so the player stays hidden
     // without precise thumb control. Sprint or a full push breaks out.
+    if (this.playing) {
+      dx *= TRUMPET_SPEED_FACTOR;
+      dy *= TRUMPET_SPEED_FACTOR;
+    }
     const wanted = Math.hypot(dx, dy) * PLAYER_SPEED;
     const cap = sprint ? Infinity : this.assistCap(dx, dy);
     this.assisting = wanted > cap;
@@ -184,7 +220,8 @@ export class GameScene extends Phaser.Scene {
       dx *= cap / wanted;
       dy *= cap / wanted;
     }
-    this.assistHint.setText(this.assisting ? (keyboard ? 'Hold Space to break cover' : 'Push to the edge to break cover') : '');
+    const breakKey = this.level.trumpet ? 'X' : 'Space';
+    this.assistHint.setText(this.assisting ? (keyboard ? `Hold ${breakKey} to break cover` : 'Push to the edge to break cover') : '');
 
     const step = (PLAYER_SPEED * dt) / 1000;
     const fromX = this.player.x;
@@ -228,6 +265,8 @@ export class GameScene extends Phaser.Scene {
       }
     }
     if (marching > 0) return marching;
+    // Gathered bystanders follow Pip in any direction, at their walking pace.
+    if (this.bystanders.contains(this.player.x, this.player.y)) return BYSTANDER_FOLLOW_SPEED * 0.95;
     return standing ? HIDE_SPEED_FLOOR * ASSIST_FLOOR_FACTOR : Infinity;
   }
 
@@ -251,9 +290,9 @@ export class GameScene extends Phaser.Scene {
   private updateDetection(dt: number): void {
     const { x, y } = this.player;
     // Hidden while inside a group and not outpacing it by more than the margin.
-    this.hidden = this.crowds.some(
-      (c) => c.contains(x, y) && this.playerSpeed <= Math.max(c.speed * HIDE_SPEED_MARGIN, HIDE_SPEED_FLOOR),
-    );
+    this.hidden =
+      this.crowds.some((c) => c.contains(x, y) && this.playerSpeed <= Math.max(c.speed * HIDE_SPEED_MARGIN, HIDE_SPEED_FLOOR)) ||
+      this.bystanders.hides(x, y, this.playerSpeed);
     const seen = this.officers.some((o) => o.canSee(x, y, this.blockers));
     this.suspicion = seen
       ? this.suspicion + dt * (this.hidden ? HIDDEN_DETECTION_RATE : 1)
@@ -287,6 +326,99 @@ export class GameScene extends Phaser.Scene {
     g.fillCircle(-9, 1, 4).fillCircle(9, 1, 4);
     g.fillStyle(0xffffff, 1).fillCircle(0, -1, 5);
     return this.add.container(0, 0, [g]).setDepth(41).setVisible(false);
+  }
+
+  /** Reads the trumpet input, fills or drains the noise meter, calls officers when it fills, draws the rings. */
+  private updateTrumpet(dt: number): void {
+    if (!this.level.trumpet) return;
+    const cfg = DIFFICULTIES[this.difficulty];
+    this.playing = this.trumpetOverride || this.keys.space.isDown || this.trumpetPointer !== null;
+    this.noise = Phaser.Math.Clamp(this.noise + (dt / 1000) * (this.playing ? cfg.noiseRisePerSec : -cfg.noiseFallPerSec), 0, 1);
+    if (this.noise >= 1) {
+      // Too loud: officers close enough, with a clear walk, come to look where Pip is now.
+      const { x, y } = this.player;
+      for (const o of this.officers) {
+        if (Math.hypot(o.x - x, o.y - y) <= cfg.alertRadius && hasLineOfSight(o.x, o.y, x, y, this.walkBlockers)) o.investigate(x, y);
+      }
+      this.noise = 0;
+      this.cameras.main.flash(180, 255, 80, 80);
+    }
+
+    this.ringClock -= dt;
+    if (this.playing && this.ringClock <= 0) {
+      this.rings.push({ x: this.player.x, y: this.player.y, age: 0 });
+      this.ringClock = RING_INTERVAL_MS;
+    }
+    const life = 900;
+    this.ringGfx.clear();
+    this.rings = this.rings.filter((r) => (r.age += dt) < life);
+    for (const r of this.rings) {
+      const t = r.age / life;
+      this.ringGfx.lineStyle(3, 0xffd23f, 0.75 * (1 - t)).strokeCircle(r.x, r.y, 20 + (cfg.hearingRadius - 20) * t);
+    }
+    this.drawNoiseMeter();
+  }
+
+  private buildNoiseMeter(): void {
+    this.add
+      .text(GAME_WIDTH / 2, 14, 'NOISE', { fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '16px', color: COLORS.text, stroke: '#000', strokeThickness: 3 })
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0)
+      .setDepth(90);
+    this.noiseBar = this.add.graphics().setScrollFactor(0).setDepth(90);
+    if (!this.sys.game.device.input.touch) {
+      this.add
+        .text(GAME_WIDTH / 2, 56, 'Hold Space to play', { fontFamily: 'Arial, sans-serif', fontSize: '15px', color: '#d0d2da', stroke: '#000', strokeThickness: 3 })
+        .setOrigin(0.5, 0)
+        .setScrollFactor(0)
+        .setDepth(90);
+    }
+    this.drawNoiseMeter();
+  }
+
+  private drawNoiseMeter(): void {
+    if (!this.noiseBar) return;
+    const w = 150;
+    const x = GAME_WIDTH / 2 - w / 2;
+    const g = this.noiseBar.clear();
+    g.fillStyle(0x000000, 0.6).fillRect(x - 3, 35, w + 6, 18);
+    const color = this.noise > 0.75 ? 0xff4a4a : this.noise > 0.5 ? 0xf2994a : 0xffd23f;
+    g.fillStyle(color, 1).fillRect(x, 38, w * this.noise, 12);
+    g.lineStyle(2, 0xffffff, 0.8).strokeRect(x - 3, 35, w + 6, 18);
+  }
+
+  /** Round trumpet button, bottom right, opposite the joystick. Held to play. */
+  private buildTrumpetButton(): void {
+    const g = this.add.graphics();
+    g.fillStyle(0x1d1f2b, 0.55).fillCircle(0, 0, 54);
+    g.lineStyle(3, 0xffd23f, 0.9).strokeCircle(0, 0, 54);
+    // A small trumpet: mouthpiece, tube, valves and bell.
+    g.fillStyle(0xffd23f, 1);
+    g.fillRect(-30, -4, 44, 8).fillRect(-36, -6, 6, 12);
+    g.fillRect(-12, -14, 5, 10).fillRect(-3, -14, 5, 10).fillRect(6, -14, 5, 10);
+    g.fillTriangle(12, -4, 12, 4, 32, 0).fillTriangle(14, 0, 34, -16, 34, 16);
+    this.trumpetButton = this.add.container(GAME_WIDTH - 78, GAME_HEIGHT - 92, [g]).setScrollFactor(0).setDepth(95);
+    const release = (p: Phaser.Input.Pointer) => p.id === this.trumpetPointer && this.releaseTrumpet();
+    this.input.on('pointerup', release);
+    this.input.on('pointerupoutside', release);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.off('pointerup', release);
+      this.input.off('pointerupoutside', release);
+    });
+  }
+
+  /** Called for every new touch: claims it for the trumpet if it lands on the button. */
+  private onTrumpetButton(p: Phaser.Input.Pointer): boolean {
+    const b = this.trumpetButton;
+    if (!b || this.trumpetPointer !== null || Math.hypot(p.x - b.x, p.y - b.y) > 58) return false;
+    this.trumpetPointer = p.id;
+    b.setScale(0.92);
+    return true;
+  }
+
+  private releaseTrumpet(): void {
+    this.trumpetPointer = null;
+    this.trumpetButton?.setScale(1);
   }
 
   private end(outcome: ResultData['outcome']): void {
@@ -332,7 +464,7 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(odd ? 0xffffff : 0x000000, 1).fillRect(x, finish.y + finish.height - sq / 2, sq, sq / 2);
     }
     this.add
-      .text(finish.x + finish.width / 2, finish.y + (finish.height - sq) / 2, 'FINISH', {
+      .text(finish.x + finish.width / 2, finish.y + (finish.height - sq) / 2, this.level.finishLabel ?? 'FINISH', {
         fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '30px', color: '#1d1f2b',
       })
       .setOrigin(0.5)
@@ -345,7 +477,15 @@ export class GameScene extends Phaser.Scene {
     const g = this.add.graphics().setDepth(10);
     // Drop shadow.
     g.fillStyle(0x000000, 0.25).fillRoundedRect(o.x + 4, o.y + 5, o.width, o.height, o.type === 'car' ? 8 : 2);
-    if (o.type === 'building') {
+    if (o.style === 'water') {
+      g.clear(); // no shadow: water lies below the quay
+      g.fillStyle(o.color ? color : 0x2f6f9a, 1).fillRect(o.x, o.y, o.width, o.height);
+      g.fillStyle(0xffffff, 0.18);
+      for (let y = o.y + 20; y < o.y + o.height; y += 46) {
+        for (let x = o.x + 8 + ((y / 46) % 2) * 18; x < o.x + o.width - 20; x += 38) g.fillRoundedRect(x, y, 16, 3, 1.5);
+      }
+      g.fillStyle(0x6b4f35, 1).fillRect(o.x + o.width - 5, o.y, 5, o.height); // quay edge
+    } else if (o.type === 'building') {
       g.fillStyle(color, 1).fillRect(o.x, o.y, o.width, o.height);
       // Roof inset and a couple of rooftop boxes.
       g.lineStyle(3, 0x000000, 0.2).strokeRect(o.x + 6, o.y + 6, o.width - 12, o.height - 12);
