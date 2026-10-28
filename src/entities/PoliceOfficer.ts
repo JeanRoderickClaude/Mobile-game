@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  ALERT_LOOK_MS, ALERT_SPEED_FACTOR, CHARACTER_SCALE, CHASE_REPATH_MS, COLORS, OFFICER_TURN_SPEED, SEARCH_PAUSE_MS, SEARCH_POINTS, SEARCH_RADIUS,
+  ALERT_LOOK_MS, ALERT_SPEED_FACTOR, CHARACTER_SCALE, CHASE_REPATH_MS, COLORS, OFFICER_TURN_SPEED, SEARCH_PAUSE_MS, SEARCH_POINTS, SEARCH_SPEED_FACTOR, SEARCH_RADIUS,
   VISION_RAYS,
 } from '../config';
 import type { LightData, OfficerData, Point, Rect } from '../levels/types';
@@ -172,12 +172,15 @@ export class PoliceOfficer {
     if (this.state === 'chasing') this.setGoal(x, y);
   }
 
-  /** The chase lost Pip: go to the last seen spot, then check around it. */
-  startSearch(x: number, y: number): void {
+  /**
+   * The chase lost Pip: walk to the first of the given points, then check the rest in turn (and
+   * round again) until the search time is up. With no points, check around (x, y).
+   */
+  startSearch(x: number, y: number, points: Point[] = []): void {
     if (this.state !== 'chasing') return;
     this.state = 'searchGo';
-    this.setGoal(x, y);
-    this.searchPoints = [];
+    this.searchPoints = points.length ? points : this.pickSearchPoints(x, y);
+    this.setGoal(this.searchPoints[0].x, this.searchPoints[0].y);
   }
 
   /** Pip's last seen spot, for the searching officer. */
@@ -275,8 +278,7 @@ export class PoliceOfficer {
         if (this.walkTo(this.goalX, this.goalY, rules.chaseSpeed, dt, 3)) {
           this.state = 'searching';
           this.searchLeft = rules.searchMs;
-          this.searchPoints = this.pickSearchPoints(this.goalX, this.goalY);
-          this.searchIndex = 0;
+          this.searchIndex = 1;
           this.searchPause = SEARCH_PAUSE_MS;
           this.lookBase = this.facing;
         }
@@ -295,7 +297,7 @@ export class PoliceOfficer {
           return;
         }
         const p = this.searchPoints[this.searchIndex % this.searchPoints.length];
-        if (this.walkTo(p.x, p.y, Math.max(70, this.data.speed * ALERT_SPEED_FACTOR), dt, 3)) {
+        if (this.walkTo(p.x, p.y, rules.chaseSpeed * SEARCH_SPEED_FACTOR, dt, 3)) {
           this.searchIndex++;
           this.searchPause = SEARCH_PAUSE_MS;
           this.lookBase = this.facing;

@@ -45,7 +45,12 @@ export interface DifficultyConfig {
   chaseReactMs: number;
   /** Chase: an officer who joins a chase stands for this long (ms) before running; longer, so Pip gets a head start. */
   chaseJoinMs: number;
-  /** Search: how long searching officers check around the last seen spot before going back to patrol. */
+  /** Search: the searchers project Pip's last seen heading this many seconds ahead (at his last seen speed, up to searchAheadMax units) and spread along that line. */
+  searchAheadSec: number;
+  searchAheadMax: number;
+  /** Search: sideways spread (units) of the points beside the projected line and around the last seen spot. */
+  searchSpread: number;
+  /** Search: how long searching officers check their points before going back to patrol. */
   searchMs: number;
   /** Search: a searching officer only notices a hidden player (in a crowd at its pace, or in the dark at night) within this distance. */
   searchCloseRange: number;
@@ -57,13 +62,13 @@ export const DIFFICULTIES = {
     label: 'Relaxed', catchTimeMs: 1500, visionRangeFactor: 0.8,
     hearingRadius: 230, noiseRisePerSec: 1 / 7, noiseFallPerSec: 1 / 4, lingerMs: 5500, alertRadius: 380,
     darkRangeFactor: 0.45, darkness: 0.62, pipLightRadius: 150, nightHearingFactor: 1.3, nightAlertFactor: 1.2,
-    chaseSpeedFactor: 1.02, chaseAlertRadius: 240, chaseReactMs: 800, chaseJoinMs: 2500, searchMs: 6500, searchCloseRange: 40,
+    chaseSpeedFactor: 1.06, chaseAlertRadius: 240, chaseReactMs: 1400, chaseJoinMs: 2500, searchAheadSec: 5, searchAheadMax: 800, searchSpread: 90, searchMs: 14000, searchCloseRange: 40,
   },
   normal: {
     label: 'Normal', catchTimeMs: 500, visionRangeFactor: 1,
     hearingRadius: 190, noiseRisePerSec: 1 / 4.5, noiseFallPerSec: 1 / 7, lingerMs: 4000, alertRadius: 520,
     darkRangeFactor: 0.5, darkness: 0.78, pipLightRadius: 120, nightHearingFactor: 1.3, nightAlertFactor: 1.3,
-    chaseSpeedFactor: 1.08, chaseAlertRadius: 300, chaseReactMs: 500, chaseJoinMs: 2000, searchMs: 8000, searchCloseRange: 55,
+    chaseSpeedFactor: 1.08, chaseAlertRadius: 300, chaseReactMs: 1400, chaseJoinMs: 2000, searchAheadSec: 6, searchAheadMax: 900, searchSpread: 100, searchMs: 12000, searchCloseRange: 55,
   },
 } satisfies Record<string, DifficultyConfig>;
 
@@ -131,6 +136,7 @@ export const NOIR_SPREAD_MS = 1400; // a won zone fills with colour from Pip's s
 export const CHASE_LOST_MS = 1000; // no chasing officer sees Pip for this long: they go to the last seen spot
 export const SEARCH_POINTS = 3; // points checked around the last seen spot
 export const SEARCH_RADIUS: [number, number] = [50, 110]; // how far from the last seen spot they are
+export const SEARCH_SPEED_FACTOR = 1.0; // searchers jog between their points at this fraction of the chase speed
 export const SEARCH_PAUSE_MS = 900; // a look around at each point
 export const NOISE_WALK_FACTOR = 1.6; // a noise only calls officers whose walk to it is at most this times the alert radius
 export const CHASE_REPATH_MS = 250; // a chasing officer re-plans its route this often

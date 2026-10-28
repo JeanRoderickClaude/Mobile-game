@@ -10,7 +10,7 @@ import { Crowd } from '../entities/Crowd';
 import { PoliceOfficer } from '../entities/PoliceOfficer';
 import { LEVELS } from '../levels';
 import { resolveLevel } from '../levels/resolve';
-import type { Obstacle, Rect, ResolvedLevel } from '../levels/types';
+import type { Obstacle, Point, Rect, ResolvedLevel } from '../levels/types';
 import type { Flags } from '../story/flags';
 import { CHAPTERS, isPlayable, pickScene } from '../story/story';
 import { finishBonus } from '../systems/economy';
@@ -65,6 +65,12 @@ export class GameScene extends Phaser.Scene {
   private chaseLastX = 0;
   private chaseLastY = 0;
   private chaseLostMs = 0;
+  /** Pip's heading and speed when a chaser last saw him, and his heading over the last moving frame. */
+  private chaseDirX = 0;
+  private chaseDirY = 0;
+  private chaseSpeed = 0;
+  private moveDirX = 0;
+  private moveDirY = 0;
   /** Night darkness over the screen, in levels with "night". */
   private nightOverlay: NightOverlay | null = null;
   /** Poster and tag spots, the poster count in the HUD, and the closed finish. */
@@ -294,6 +300,11 @@ export class GameScene extends Phaser.Scene {
     this.player.y = this.resolveAxis(this.player.x, this.player.y + dy * step, 'y');
     // Measured after collision, so pushing into a wall counts as standing still.
     this.playerSpeed = dt > 0 ? (Math.hypot(this.player.x - fromX, this.player.y - fromY) * 1000) / dt : 0;
+    const moved = Math.hypot(this.player.x - fromX, this.player.y - fromY);
+    if (moved > 0.05) {
+      this.moveDirX = (this.player.x - fromX) / moved;
+      this.moveDirY = (this.player.y - fromY) / moved;
+    }
     this.player.updateMotion(dx, dy, dt);
   }
 
@@ -396,9 +407,7 @@ export class GameScene extends Phaser.Scene {
     const cfg = DIFFICULTIES[this.difficulty];
     if (this.suspicion >= this.catchTimeMs) {
       for (const o of noticing) if (o.watching) o.beginChase(x, y, cfg.chaseReactMs);
-      this.chaseLastX = x;
-      this.chaseLastY = y;
-      this.chaseLostMs = 0;
+      this.markSeen();
       this.suspicion = 0;
     }
     for (const o of noticing) if (o.searching) o.beginChase(x, y, cfg.chaseReactMs);
@@ -413,18 +422,67 @@ export class GameScene extends Phaser.Scene {
     chasers = this.officers.filter((o) => o.chasing);
 
     if (chasers.some((o) => noticing.includes(o))) {
-      this.chaseLastX = x;
-      this.chaseLastY = y;
-      this.chaseLostMs = 0;
+      this.markSeen();
     } else {
       this.chaseLostMs += dt;
     }
     for (const o of chasers) o.chaseTo(this.chaseLastX, this.chaseLastY);
     if (this.chaseLostMs >= CHASE_LOST_MS) {
-      for (const o of chasers) o.startSearch(this.chaseLastX, this.chaseLastY);
+      this.startSearch(chasers);
       this.chaseLostMs = 0;
     }
     if (chasers.some((o) => Math.hypot(o.x - x, o.y - y) <= PLAYER_RADIUS + OFFICER_RADIUS)) this.end('caught');
+  }
+
+  /** A chaser sees Pip now: remember where, which way he was heading and how fast. */
+  private markSeen(): void {
+    this.chaseLastX = this.player.x;
+    this.chaseLastY = this.player.y;
+    this.chaseDirX = this.moveDirX;
+    this.chaseDirY = this.moveDirY;
+    this.chaseSpeed = this.playerSpeed;
+    this.chaseLostMs = 0;
+  }
+
+  /**
+   * The chasers lost Pip. Points are laid along the line he was heading (his last seen speed times
+   * searchAheadSec, up to searchAheadMax, stopping at the first wall) with a point to each side of
+   * the line's middle and end, and around the last seen spot. The officers split them: each starts
+   * at a different one and checks the rest in turn.
+   */
+  private startSearch(chasers: PoliceOfficer[]): void {
+    const cfg = DIFFICULTIES[this.difficulty];
+    const nav = PoliceOfficer.nav;
+    const x0 = this.chaseLastX, y0 = this.chaseLastY;
+    const free = (x: number, y: number) => !nav || nav.isFree(x, y);
+    const reach = Math.min(cfg.searchAheadMax, this.chaseSpeed * cfg.searchAheadSec);
+    let len = 0;
+    if (reach >= 40) {
+      for (let d = 20; d <= reach; d += 20) {
+        const px = x0 + this.chaseDirX * d, py = y0 + this.chaseDirY * d;
+        if (!free(px, py) || (nav && !nav.clear(x0, y0, px, py))) break;
+        len = d;
+      }
+    }
+    const pts: Point[] = [];
+    const at = (d: number, side: number): void => {
+      const px = x0 + this.chaseDirX * d - this.chaseDirY * side, py = y0 + this.chaseDirY * d + this.chaseDirX * side;
+      if (free(px, py) && (!nav || nav.clear(x0, y0, px, py) || nav.findPath(x0, y0, px, py).length > 0)) pts.push({ x: px, y: py });
+    };
+    if (len >= 40) {
+      // Along the line, nearest first, then the sides of its middle and end.
+      for (let k = 1; k <= 3; k++) at((len * k) / 3, 0);
+      at(len / 2, cfg.searchSpread);
+      at(len / 2, -cfg.searchSpread);
+      at(len, cfg.searchSpread);
+      at(len, -cfg.searchSpread);
+    }
+    pts.unshift({ x: x0, y: y0 });
+    const n = chasers.length;
+    chasers.forEach((o, i) => {
+      const from = Math.floor((i * pts.length) / n);
+      o.startSearch(x0, y0, pts.map((_, k) => pts[(from + k) % pts.length]));
+    });
   }
 
   /** Small bubble with three heads, shown above the player while hidden in a crowd. */
