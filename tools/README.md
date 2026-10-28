@@ -143,7 +143,7 @@ For levels with `"chaseMode": true`, such as the practice level `src/levels/dev/
 
 The level does not end at the finish. A run ends when Pip is caught (a chasing officer touches him), when every officer is back on patrol with Pip free ("got away"), or after 60 s. The output gives, per player, how many got away, were caught or were still chased, how many runs had a search begin, how long until the chase was over, how many officers chased at once, and for `hide` how often a searching officer came within 80 units of him while he was hidden and how often it noticed him. `caught at` lists where.
 
-`--speed`, `--react` and `--join` override the difficulty's `chaseSpeedFactor`, `chaseReactMs` and `chaseJoinMs` for one run, to try values before putting them in `config.ts`.
+`--speed`, `--react`, `--join`, `--alert`, `--ahead`, `--max`, `--spread` and `--search` override the difficulty's `chaseSpeedFactor`, `chaseReactMs`, `chaseJoinMs`, `chaseAlertRadius`, `searchAheadSec`, `searchAheadMax`, `searchSpread` and `searchMs`; `--why` prints each time a searcher took up the chase (distance, whether Pip was hidden) and, for `hide`, the closest searcher in every run for one run, to try values before putting them in `config.ts`.
 
 ```
 node tools/chase.mjs src/levels/dev/practice-chase.json --hold

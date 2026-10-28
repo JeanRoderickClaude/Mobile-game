@@ -12,7 +12,7 @@
 // search ended, every officer back on patrol, with Pip not caught.
 // Usage:
 //   node tools/chase.mjs src/levels/dev/practice-chase.json [--starts 23] [--every 1500]
-//        [--spot 245,1140] [--difficulty easy] [--hold] [--speed 1.1] [--react 400] [--join 1500]
+//        [--spot 245,1140] [--difficulty easy] [--hold] [--speed 1.1] [--react 400] [--join 1500] [--ahead 3] [--spread 70] [--search 8000] [--alert 300] [--why]
 // --speed, --react and --join override the difficulty's chaseSpeedFactor, chaseReactMs and chaseJoinMs
 //         for this run, to try values before putting them in config.ts.
 // --hold adds a third player who just stands still where he was spotted.
@@ -39,7 +39,12 @@ await run(args._[0], async (page) => {
     if (over.speed !== undefined) cfg.chaseSpeedFactor = over.speed;
     if (over.react !== undefined) cfg.chaseReactMs = over.react;
     if (over.join !== undefined) cfg.chaseJoinMs = over.join;
-    const used = `chase speed ${cfg.chaseSpeedFactor} x Pip, react ${cfg.chaseReactMs} ms, join ${cfg.chaseJoinMs} ms`;
+    if (over.ahead !== undefined) cfg.searchAheadSec = over.ahead;
+    if (over.spread !== undefined) cfg.searchSpread = over.spread;
+    if (over.max !== undefined) cfg.searchAheadMax = over.max;
+    if (over.alert !== undefined) cfg.chaseAlertRadius = over.alert;
+    if (over.search !== undefined) cfg.searchMs = over.search;
+    const used = `chase speed ${cfg.chaseSpeedFactor} x Pip, react ${cfg.chaseReactMs} ms, join ${cfg.chaseJoinMs} ms, search ${cfg.searchMs} ms, ahead ${cfg.searchAheadSec} s (max ${cfg.searchAheadMax}), spread ${cfg.searchSpread}`;
     let trace = false;
     const lines = [];
     const STEP = 16;
@@ -69,7 +74,7 @@ await run(args._[0], async (page) => {
       s.chaseLastX = spot[0]; s.chaseLastY = spot[1]; s.chaseLostMs = 0;
       let shotSpot = false, shotSearch = false;
       const wasSearching = [];
-      let closeCall = false, noticed = false;
+      let closeCall = false, noticed = false, minHidden = Infinity;
       let runTo = finish0, path = [], pathAt = -1e9, sawSearch = false, chaseEndedAt = null, peakChasers = 0, meet = null, meetAt = -1e9, pocketAt = -1e9, lostThem = false, pocket = null, atPocket = false;
       const finish = finish0;
       const goTo = (t, gx, gy, push) => {
@@ -169,6 +174,8 @@ await run(args._[0], async (page) => {
         for (const [i, k] of s.officers.entries()) {
           const was = wasSearching[i];
           wasSearching[i] = k.searching;
+          if (was && k.chasing && over.why) lines.push(`  t=${t} officer ${i} took up the chase: dist ${Math.round(Math.hypot(k.x - s.player.x, k.y - s.player.y))} hidden ${s.hidden} speed ${Math.round(s.playerSpeed)} others chasing ${s.officers.filter((j, n) => n !== i && j.chasing).length} suspicion ${Math.round(s.suspicion)}`);
+          if (s.hidden && k.searching) minHidden = Math.min(minHidden, Math.hypot(k.x - s.player.x, k.y - s.player.y));
           if (s.hidden && (k.searching || (was && k.chasing)) && Math.hypot(k.x - s.player.x, k.y - s.player.y) <= 80) {
             closeCall = true;
             if (was && k.chasing) noticed = true;
@@ -178,7 +185,7 @@ await run(args._[0], async (page) => {
         if (chaseEndedAt !== null) { if (trace) await snap('4-back-on-patrol'); break; } // the chase is over with Pip free: that is the measure
       }
       const caught = s.finished;
-      return { closeCall, noticed, caught, free: !caught && chaseEndedAt !== null, end: `${Math.round(s.player.x)},${Math.round(s.player.y)}`, time: s.elapsedMs - delay, sawSearch, chaseEndedAt, peakChasers, at: caught ? `${Math.round(s.player.x)},${Math.round(s.player.y)}` : null };
+      return { minHidden, closeCall, noticed, caught, free: !caught && chaseEndedAt !== null, end: `${Math.round(s.player.x)},${Math.round(s.player.y)}`, time: s.elapsedMs - delay, sawSearch, chaseEndedAt, peakChasers, at: caught ? `${Math.round(s.player.x)},${Math.round(s.player.y)}` : null };
     }
 
     if (traceArg) {
@@ -204,10 +211,11 @@ await run(args._[0], async (page) => {
       lines.push(`${names[p]}: got away ${esc.length} of ${rows.length}, caught ${caughtN}, still chased or searched for after 60 s ${rows.length - esc.length - caughtN}; searches began in ${searched}` +
         (ended.length ? `; chase over after avg ${(ended.reduce((a, r) => a + r.chaseEndedAt, 0) / ended.length / 1000).toFixed(1)} s` : '') + `; most officers chasing at once ${avgPeak.toFixed(1)} on average` +
         (p === 'hide' ? `; a searching officer came within 80 of him while hidden in ${close.length} runs, and noticed him in ${close.filter((r) => r.noticed).length}` : ''));
+      if (over.why && p === 'hide') lines.push('  hide runs (got away / caught): closest searcher while hidden: ' + rows.map((r) => `${r.free ? 'ok' : 'X'}:${r.minHidden === Infinity ? '-' : Math.round(r.minHidden)}`).join(' '));
       const caught = rows.filter((r) => r.caught).map((r) => r.at);
       if (caught.length) lines.push(`  caught at: ${caught.join(' ')}`);
     }
     return lines;
-  }, [spot, starts, every, !!args.hold, args.trace ?? null, { speed: args.speed, react: args.react, join: args.join }, args.difficulty ?? 'normal']);
+  }, [spot, starts, every, !!args.hold, args.trace ?? null, { speed: args.speed, react: args.react, join: args.join, ahead: args.ahead, max: args.max, alert: args.alert, spread: args.spread, search: args.search, why: !!args.why }, args.difficulty ?? 'normal']);
   out.forEach((l) => console.log(l));
 });
