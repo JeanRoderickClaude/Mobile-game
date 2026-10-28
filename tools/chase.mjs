@@ -12,10 +12,10 @@
 // search ended, every officer back on patrol, with Pip not caught.
 // Usage:
 //   node tools/chase.mjs src/levels/dev/practice-chase.json [--starts 23] [--every 1500]
-//        [--spot 245,1140] [--difficulty easy] [--hold] [--speed 1.1] [--react 400] [--join 1500] [--ahead 3] [--spread 70] [--search 8000] [--alert 300] [--pursuit 3000] [--only flee,hide] [--why]
+//        [--spot 245,1140] [--difficulty easy] [--hold] [--speed 1.1] [--react 400] [--join 1500] [--ahead 3] [--spread 70] [--search 8000] [--drain 4] [--recover 8] [--rest 2] [--tired 0.6] [--alert 300] [--pursuit 3000] [--only flee,hide] [--why]
 // --speed, --react and --join override the difficulty's chaseSpeedFactor, chaseReactMs and chaseJoinMs
 //         for this run, to try values before putting them in config.ts.
-// --hold adds a third player who just stands still where he was spotted.
+// Several players run one after another, each in a fresh browser. --hold adds a player who just stands still where he was spotted.
 // --trace hide,5 prints a line every 500 ms for one run (policy, start number).
 // --shots dir --trace hide,5 also saves screenshots of that run at the spot, when a search begins, when the
 //         officers are back on patrol, and every 4 s in between (needs a trace).
@@ -25,6 +25,26 @@ const args = parseArgs();
 const spot = String(args.spot ?? '245,1140').split(',').map(Number);
 const starts = args.starts ?? 23;
 const every = args.every ?? 1500;
+
+// Several players: each runs in its own browser and server, so nothing carries over from one to the next.
+const wanted = args.only ? String(args.only).split(',') : args.hold ? ['run', 'flee', 'hide', 'hold'] : ['run', 'flee', 'hide'];
+if (wanted.length > 1 && !args.trace) {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const raw = process.argv.slice(2);
+  const rest = [];
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === '--only') { i++; continue; }
+    rest.push(raw[i]);
+  }
+  wanted.forEach((p, i) => {
+    const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), ...rest, '--only', p], { encoding: 'utf8', maxBuffer: 1 << 26 });
+    // The first child's header (difficulty and values) is kept; later ones repeat it.
+    process.stdout.write(r.stdout.split('\n').filter((l, n) => i === 0 || (!l.startsWith('Difficulty') && !l.startsWith('chase speed'))).join('\n'));
+    if (r.stderr) process.stderr.write(r.stderr);
+  });
+  process.exit(0);
+}
 
 await run(args._[0], async (page) => {
   if (args.shots) {
@@ -45,7 +65,11 @@ await run(args._[0], async (page) => {
     if (over.alert !== undefined) cfg.chaseAlertRadius = over.alert;
     if (over.pursuit !== undefined) cfg.chasePursuitMs = over.pursuit;
     if (over.search !== undefined) cfg.searchMs = over.search;
-    const used = `chase speed ${cfg.chaseSpeedFactor} x Pip, react ${cfg.chaseReactMs} ms, join ${cfg.chaseJoinMs} ms, pursuit ${cfg.chasePursuitMs} ms, search ${cfg.searchMs} ms, ahead ${cfg.searchAheadSec} s (max ${cfg.searchAheadMax}), spread ${cfg.searchSpread}`;
+    if (over.drain !== undefined) cfg.staminaDrainSec = over.drain;
+    if (over.recover !== undefined) cfg.staminaRecoverSec = over.recover;
+    if (over.rest !== undefined) cfg.staminaRestFactor = over.rest;
+    if (over.tired !== undefined) cfg.staminaTiredFactor = over.tired;
+    const used = `chase speed ${cfg.chaseSpeedFactor} x Pip, react ${cfg.chaseReactMs} ms, join ${cfg.chaseJoinMs} ms, pursuit ${cfg.chasePursuitMs} ms, search ${cfg.searchMs} ms, stamina ${cfg.staminaDrainSec} s drain / ${cfg.staminaRecoverSec} s recover / x${cfg.staminaRestFactor} resting / tired speed ${cfg.staminaTiredFactor}, ahead ${cfg.searchAheadSec} s (max ${cfg.searchAheadMax}), spread ${cfg.searchSpread}`;
     let trace = false;
     const lines = [];
     const STEP = 16;
@@ -158,7 +182,7 @@ await run(args._[0], async (page) => {
           for (let d = 0; d < len; d += 30) {
             const q = { x: a.x + ((b.x - a.x) * d) / len, y: a.y + ((b.y - a.y) * d) / len };
             const crowdEta = (along + d) / c.speed;
-            const pipEta = pathLen(s.player.x, s.player.y, q.x, q.y) / 170;
+            const pipEta = pathLen(s.player.x, s.player.y, q.x, q.y) / (s.tired ? 102 : 170);
             if (Math.hypot(q.x - s.chaseLastX, q.y - s.chaseLastY) < 200) continue;
             if (pipEta + 0.3 <= crowdEta) return q;
             best = q;
@@ -197,7 +221,7 @@ await run(args._[0], async (page) => {
           }
         }
         s.update(0, STEP);
-        if (trace && t % 480 === 0) lines.push(`  t=${t} pip ${Math.round(s.player.x)},${Math.round(s.player.y)} spd ${Math.round(s.playerSpeed)} ${s.hidden ? 'HIDDEN' : ''}${lostThem ? ' lost-them' : ''} | ` + s.officers.map((k, i) => `${i}:${k.chasing ? 'C' : k.searching ? 'S' : k.alerted ? 'r' : '.'}@${Math.round(k.x)},${Math.round(k.y)} d${Math.round(Math.hypot(k.x - s.player.x, k.y - s.player.y))}`).join(' ') + ` crowd ${s.crowds[0].active ? Math.round(s.crowds[0].x) + ',' + Math.round(s.crowds[0].y) : '-'}`);
+        if (trace && t % 480 === 0) lines.push(`  t=${t} pip ${Math.round(s.player.x)},${Math.round(s.player.y)} spd ${Math.round(s.playerSpeed)} st ${s.stamina.toFixed(2)}${s.tired ? "T" : ""} ${s.hidden ? 'HIDDEN' : ''}${lostThem ? ' lost-them' : ''} | ` + s.officers.map((k, i) => `${i}:${k.chasing ? 'C' : k.searching ? 'S' : k.alerted ? 'r' : '.'}@${Math.round(k.x)},${Math.round(k.y)} d${Math.round(Math.hypot(k.x - s.player.x, k.y - s.player.y))}`).join(' ') + ` crowd ${s.crowds[0].active ? Math.round(s.crowds[0].x) + ',' + Math.round(s.crowds[0].y) : '-'}`);
         const chasers = s.officers.filter((k) => k.chasing).length;
         peakChasers = Math.max(peakChasers, chasers);
         if (trace && !shotSpot) { shotSpot = true; await snap('1-spotted'); }
@@ -250,6 +274,6 @@ await run(args._[0], async (page) => {
       if (caught.length) lines.push(`  caught at: ${caught.join(' ')}`);
     }
     return lines;
-  }, [spot, starts, every, !!args.hold, args.trace ?? null, { speed: args.speed, react: args.react, join: args.join, ahead: args.ahead, max: args.max, alert: args.alert, pursuit: args.pursuit, only: args.only, spread: args.spread, search: args.search, why: !!args.why }, args.difficulty ?? 'normal']);
+  }, [spot, starts, every, !!args.hold, args.trace ?? null, { speed: args.speed, react: args.react, join: args.join, ahead: args.ahead, max: args.max, alert: args.alert, pursuit: args.pursuit, drain: args.drain, recover: args.recover, rest: args.rest, tired: args.tired, only: args.only, spread: args.spread, search: args.search, why: !!args.why }, args.difficulty ?? 'normal']);
   out.forEach((l) => console.log(l));
 });

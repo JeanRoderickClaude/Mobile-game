@@ -93,6 +93,10 @@ export class GameScene extends Phaser.Scene {
   private hiddenIcon!: Phaser.GameObjects.Container;
   private playerSpeed = 0; // actual units per second over the last frame
   private hidden = false;
+  /** Chase levels: stamina 0..1, whether Pip is winded (capped to crowd pace until it recovers), and its bar. */
+  private stamina = 1;
+  private tired = false;
+  private staminaBar!: Phaser.GameObjects.Graphics;
 
   constructor() {
     super('game');
@@ -105,6 +109,10 @@ export class GameScene extends Phaser.Scene {
     this.difficulty = data.difficulty ?? getDifficulty();
     this.catchTimeMs = DIFFICULTIES[this.difficulty].catchTimeMs * this.level.catchTimeFactor;
     this.assisting = false;
+    this.stamina = 1;
+    this.tired = false;
+    this.chaseLastX = this.chaseLastY = this.chaseDirX = this.chaseDirY = this.chaseSpeed = this.chaseLostMs = 0;
+    this.moveDirX = this.moveDirY = 0;
     this.officers = [];
     this.crowds = [];
     this.coins = [];
@@ -166,6 +174,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 1, 0.15);
 
     this.meter = this.add.graphics().setDepth(40);
+    this.staminaBar = this.add.graphics().setDepth(40);
     this.hiddenIcon = this.buildHiddenIcon();
 
     const kb = this.input.keyboard!;
@@ -219,7 +228,7 @@ export class GameScene extends Phaser.Scene {
     if (this.level.noir) {
       // Everything in the world goes into the filtered layer, except Pip, his
       // suspicion bar and hidden icon (always in colour) and the HUD (scroll factor 0).
-      const keep = new Set<Phaser.GameObjects.GameObject>([this.player, this.meter, this.hiddenIcon, ...this.spots.overlay]);
+      const keep = new Set<Phaser.GameObjects.GameObject>([this.player, this.meter, this.staminaBar, this.hiddenIcon, ...this.spots.overlay]);
       const world = this.children.list.filter((o) => !keep.has(o) && (o as unknown as { scrollFactorX?: number }).scrollFactorX !== 0);
       this.noir = new Noir(this, this.level.noir.zones);
       this.noir.adopt(world);
@@ -290,6 +299,18 @@ export class GameScene extends Phaser.Scene {
       dx *= cap / wanted;
       dy *= cap / wanted;
     }
+    if (this.level.chaseMode) {
+      // Stamina: running faster than crowd pace drains it; empty, Pip is capped near crowd pace until it recovers.
+      const sc = DIFFICULTIES[this.difficulty];
+      let speed = Math.hypot(dx, dy) * PLAYER_SPEED;
+      const tiredCap = PLAYER_SPEED * sc.staminaTiredFactor;
+      if (this.tired && speed > tiredCap) {
+        dx *= tiredCap / speed;
+        dy *= tiredCap / speed;
+        speed = tiredCap;
+      }
+      this.updateStamina(dt, speed);
+    }
     this.assistHint.setText(this.assisting ? (keyboard ? 'Hold X to break cover' : 'Push to the edge to break cover') : '');
 
     const step = (PLAYER_SPEED * dt) / 1000;
@@ -344,6 +365,31 @@ export class GameScene extends Phaser.Scene {
     return standing ? HIDE_SPEED_FLOOR * ASSIST_FLOOR_FACTOR : Infinity;
   }
 
+  /** Drains stamina above crowd pace, recovers it at or below (twice as fast hidden or in darkness), and draws the bar under Pip. */
+  private updateStamina(dt: number, speed: number): void {
+    const cfg = DIFFICULTIES[this.difficulty];
+    const pace = PLAYER_SPEED * WALK_FACTOR;
+    if (speed > pace * 1.02) {
+      this.stamina -= ((speed - pace) / (PLAYER_SPEED - pace)) * (dt / 1000) / cfg.staminaDrainSec;
+    } else {
+      const rest = this.hidden || (!!this.level.night && PoliceOfficer.rangeFactorAt(this.player.x, this.player.y) < 1);
+      this.stamina += (dt / 1000) * (rest ? cfg.staminaRestFactor : 1) / cfg.staminaRecoverSec;
+    }
+    this.stamina = Phaser.Math.Clamp(this.stamina, 0, 1);
+    if (this.stamina <= 0) this.tired = true;
+    else if (this.tired && this.stamina >= cfg.staminaResume) this.tired = false;
+  }
+
+  private drawStamina(): void {
+    const g = this.staminaBar.clear();
+    if (!this.level.chaseMode) return;
+    const x = this.player.x - 20;
+    const y = this.player.y + 30 * CHARACTER_SCALE;
+    const color = this.tired ? 0xe05a4f : this.stamina < 0.3 ? 0xffd23f : 0x7be08f;
+    g.fillStyle(0x000000, 0.6).fillRect(x - 2, y - 2, 44, 9);
+    g.fillStyle(color, 1).fillRect(x, y, 40 * this.stamina, 5);
+  }
+
   /** Returns the corrected coordinate on one axis after pushing out of blockers and world edges. */
   private resolveAxis(x: number, y: number, axis: 'x' | 'y'): number {
     const r = PLAYER_RADIUS;
@@ -389,6 +435,7 @@ export class GameScene extends Phaser.Scene {
       this.meter.fillStyle(COLORS.coneAlert, 1).fillRect(x, y, 40 * alert, 6);
     }
 
+    this.drawStamina();
     this.hiddenIcon.setVisible(this.hidden).setPosition(x, y - 58 * CHARACTER_SCALE);
 
     if (this.level.chaseMode) this.updateChase(dt, noticing);
