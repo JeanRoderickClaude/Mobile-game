@@ -41,7 +41,7 @@ export class PoliceOfficer {
   static nav: NavGrid | null = null;
 
   /** Chase and search values of the difficulty, set by GameScene. */
-  static rules = { chaseSpeed: 160, searchMs: 8000, closeRange: 55 };
+  static rules = { chaseSpeed: 160, searchMs: 8000, closeRange: 55, reactMs: 300, joinMs: 900 };
 
   readonly data: OfficerData;
   /** Outline of the last drawn cone (x, y pairs, starting at the officer), for the night overlay's flashlight holes. */
@@ -68,6 +68,7 @@ export class PoliceOfficer {
   private pathGY = NaN;
   private repathLeft = 0;
   private searchLeft = 0;
+  private reactLeft = 0; // startled: a chasing officer stands this long before running
   private searchPoints: Point[] = [];
   private searchIndex = 0;
   private searchPause = 0;
@@ -149,10 +150,20 @@ export class PoliceOfficer {
     this.setGoal(x, y);
   }
 
-  /** Start (or keep) chasing: run after the shared target, set with chaseTo. */
-  beginChase(x: number, y: number): void {
+  /**
+   * Start chasing: after reactMs standing startled, run after the shared target (set with chaseTo).
+   * Calling it again for an officer who is already chasing does nothing but update the target.
+   */
+  beginChase(x: number, y: number, reactMs = 0): void {
+    if (this.state === 'chasing') {
+      this.setGoal(x, y);
+      return;
+    }
     this.leavePatrol();
     this.state = 'chasing';
+    this.reactLeft = reactMs;
+    this.path = [];
+    this.pathGX = NaN;
     this.setGoal(x, y);
   }
 
@@ -250,6 +261,13 @@ export class PoliceOfficer {
         }
         return;
       case 'chasing':
+        if (this.reactLeft > 0) {
+          // Startled: stand and turn to the target before running.
+          this.reactLeft -= deltaMs;
+          const diff = angleDiff(Math.atan2(this.goalY - this.y, this.goalX - this.x), this.facing);
+          this.facing += Phaser.Math.Clamp(diff, -OFFICER_TURN_SPEED * 3 * dt, OFFICER_TURN_SPEED * 3 * dt);
+          return;
+        }
         // Run to the shared target; standing there means Pip is not in sight, and the scene will start the search.
         this.walkTo(this.goalX, this.goalY, rules.chaseSpeed, dt, 4);
         return;

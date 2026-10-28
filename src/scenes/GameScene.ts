@@ -122,7 +122,9 @@ export class GameScene extends Phaser.Scene {
     const cfg = DIFFICULTIES[this.difficulty];
     this.chaseLostMs = 0;
     PoliceOfficer.nav = new NavGrid(this.level.width, this.level.height, this.level.obstacles);
-    PoliceOfficer.rules = { chaseSpeed: PLAYER_SPEED * cfg.chaseSpeedFactor, searchMs: cfg.searchMs, closeRange: cfg.searchCloseRange };
+    PoliceOfficer.rules = {
+      chaseSpeed: PLAYER_SPEED * cfg.chaseSpeedFactor, searchMs: cfg.searchMs, closeRange: cfg.searchCloseRange, reactMs: cfg.chaseReactMs, joinMs: cfg.chaseJoinMs,
+    };
     PoliceOfficer.sight = this.level.night
       ? { night: true, lights: this.level.night.lights, darkFactor: cfg.darkRangeFactor }
       : { night: false, lights: [], darkFactor: 1 };
@@ -393,20 +395,20 @@ export class GameScene extends Phaser.Scene {
     const { x, y } = this.player;
     const cfg = DIFFICULTIES[this.difficulty];
     if (this.suspicion >= this.catchTimeMs) {
-      for (const o of noticing) if (o.watching) o.beginChase(x, y);
+      for (const o of noticing) if (o.watching) o.beginChase(x, y, cfg.chaseReactMs);
       this.chaseLastX = x;
       this.chaseLastY = y;
       this.chaseLostMs = 0;
       this.suspicion = 0;
     }
-    for (const o of noticing) if (o.searching) o.beginChase(x, y);
+    for (const o of noticing) if (o.searching) o.beginChase(x, y, cfg.chaseReactMs);
 
     let chasers = this.officers.filter((o) => o.chasing);
     if (!chasers.length) return;
     // Officers within reach of a chaser join, wherever they are in their routine.
     for (const o of this.officers) {
       if (o.chasing) continue;
-      if (chasers.some((c) => Math.hypot(c.x - o.x, c.y - o.y) <= cfg.chaseAlertRadius)) o.beginChase(this.chaseLastX, this.chaseLastY);
+      if (chasers.some((c) => Math.hypot(c.x - o.x, c.y - o.y) <= cfg.chaseAlertRadius)) o.beginChase(this.chaseLastX, this.chaseLastY, cfg.chaseJoinMs);
     }
     chasers = this.officers.filter((o) => o.chasing);
 

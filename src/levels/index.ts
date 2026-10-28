@@ -4,16 +4,17 @@ import { MODIFIER_FACTORS, type LevelData } from './types';
 // Every JSON file in this folder is a level. They are played in file-name
 // order, so adding "level-02.json" adds a level without code changes.
 const modules = import.meta.glob<LevelData>('./*.json', { eager: true, import: 'default' });
-// Levels in ./dev/ exist only in development builds (practice levels for trying a mechanic). They come after the
-// real levels, so the real levels keep their indices. In a production build the branch below is removed.
-const devModules = import.meta.env.DEV ? import.meta.glob<LevelData>('./dev/*.json', { eager: true, import: 'default' }) : {};
+// Levels in ./dev/ are practice levels for trying a mechanic. They come after the real levels, so the real levels
+// keep their indices. The build setting VITE_PRACTICE_LEVEL=off leaves them (and the menu's Practice button) out;
+// the branch below is then removed from the bundle.
+const devModules = import.meta.env.VITE_PRACTICE_LEVEL !== 'off' ? import.meta.glob<LevelData>('./dev/*.json', { eager: true, import: 'default' }) : {};
 
 export const LEVELS: LevelData[] = [
   ...Object.keys(modules).sort().map((path) => validate(modules[path], path)),
   ...Object.keys(devModules).sort().map((path) => validate(devModules[path], path)),
 ];
 
-/** Index of the dev-only practice level for the chase and search system, or -1 in production builds. */
+/** Index of the practice level for the chase and search system, or -1 when the build setting VITE_PRACTICE_LEVEL=off is used. */
 export const PRACTICE_LEVEL_INDEX = LEVELS.findIndex((l) => l.id === 'practice-chase');
 
 function validate(level: LevelData, path: string): LevelData {

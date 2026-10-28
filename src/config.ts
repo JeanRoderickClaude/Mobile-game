@@ -41,6 +41,10 @@ export interface DifficultyConfig {
   chaseSpeedFactor: number;
   /** Chase: a chasing officer alerts every officer within this distance, who join the chase. */
   chaseAlertRadius: number;
+  /** Chase: the officer whose meter filled stands startled for this long (ms) before running. */
+  chaseReactMs: number;
+  /** Chase: an officer who joins a chase stands for this long (ms) before running; longer, so Pip gets a head start. */
+  chaseJoinMs: number;
   /** Search: how long searching officers check around the last seen spot before going back to patrol. */
   searchMs: number;
   /** Search: a searching officer only notices a hidden player (in a crowd at its pace, or in the dark at night) within this distance. */
@@ -53,13 +57,13 @@ export const DIFFICULTIES = {
     label: 'Relaxed', catchTimeMs: 1500, visionRangeFactor: 0.8,
     hearingRadius: 230, noiseRisePerSec: 1 / 7, noiseFallPerSec: 1 / 4, lingerMs: 5500, alertRadius: 380,
     darkRangeFactor: 0.45, darkness: 0.62, pipLightRadius: 150, nightHearingFactor: 1.3, nightAlertFactor: 1.2,
-    chaseSpeedFactor: 0.85, chaseAlertRadius: 240, searchMs: 6500, searchCloseRange: 40,
+    chaseSpeedFactor: 1.02, chaseAlertRadius: 240, chaseReactMs: 800, chaseJoinMs: 2500, searchMs: 6500, searchCloseRange: 40,
   },
   normal: {
     label: 'Normal', catchTimeMs: 500, visionRangeFactor: 1,
     hearingRadius: 190, noiseRisePerSec: 1 / 4.5, noiseFallPerSec: 1 / 7, lingerMs: 4000, alertRadius: 520,
     darkRangeFactor: 0.5, darkness: 0.78, pipLightRadius: 120, nightHearingFactor: 1.3, nightAlertFactor: 1.3,
-    chaseSpeedFactor: 0.94, chaseAlertRadius: 300, searchMs: 8000, searchCloseRange: 55,
+    chaseSpeedFactor: 1.08, chaseAlertRadius: 300, chaseReactMs: 500, chaseJoinMs: 2000, searchMs: 8000, searchCloseRange: 55,
   },
 } satisfies Record<string, DifficultyConfig>;
 
