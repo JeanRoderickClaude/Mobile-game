@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { CAST, DIALOGUES, type CastMember, type DialogueLine, type PortraitShape } from '../story/story';
+import { Character } from '../entities/Character';
 import { matches } from '../story/flags';
-import { getFlags, setFlags } from '../systems/save';
+import { CAST, DIALOGUES, PLAYER_CAST_ID, castLook, type DialogueLine, type StageName } from '../story/story';
+import { equippedLook, getFlags, setFlags } from '../systems/save';
 import { FONT, FONT_BOLD, makeButton, type Button } from '../ui/widgets';
 
 /** Where to go when the dialogue ends. */
@@ -16,7 +17,7 @@ export interface NextScene {
 export interface DialogueSceneData {
   dialogueId: string;
   then: NextScene;
-  /** Drawn over a paused scene: dim it instead of covering it. */
+  /** Drawn over a paused scene: dim the part below the stage instead of covering it. */
   overlay?: boolean;
 }
 
@@ -24,25 +25,40 @@ export interface DialogueSceneData {
 // a key held from the previous scene does not skip the first line.
 const INPUT_DELAY_MS = 300;
 
-// The panel sits on the bottom edge and grows upward to fit the line, so
-// text keeps one size however long it is. Text spans the full panel width
-// under the portrait row: about 34 characters per row at 26px.
-const PANEL_X = 12;
-const PANEL_W = GAME_WIDTH - 24;
-const PANEL_BOTTOM = 948;
-const PANEL_MIN_H = 300; // speech: portrait row plus three rows of text
-const NARRATION_MIN_H = 200; // narration has no portrait row
-const PANEL_MAX_TOP = 96; // never cover the Skip button
-const PAD = 24;
-const PORTRAIT = 84; // portrait box size
-const TEXT_W = PANEL_W - PAD * 2;
-const HINT_H = 40; // room under the text for "Tap to continue"
-const HORIZON = 600; // bottom of the harbor backdrop
+// The top half is the stage: a background strip with the characters in
+// front view, feet on FLOOR_Y. The dialogue box sits below it.
+const STAGE_H = 480;
+const FLOOR_Y = 452;
+const STAGE_SCALE = 2.7;
+const STEP_FORWARD = 16; // the speaker moves this far down (toward the viewer)...
+const STEP_SCALE = 1.07; // ...and grows by this much
+const DIM = 0.42; // brightness of everyone who is not speaking
+const MOVE_MS = 450; // walking on or off
+
+// The box keeps one height per scene, sized to its longest line, so it does
+// not jump between lines. Text is 26px and wraps across the full box width:
+// about 34 characters per row.
+const BOX_X = 12;
+const BOX_W = GAME_WIDTH - 24;
+const BOX_TOP = STAGE_H + 16;
+const BOX_MAX_BOTTOM = GAME_HEIGHT - 16;
+const PAD = 22;
+const NAME_H = 38; // name row above spoken lines
+const HINT_H = 36; // room under the text for "Tap to continue"
+const TEXT_W = BOX_W - PAD * 2;
+
+interface Actor {
+  character: Character;
+  x: number;
+  on: boolean;
+  brightness: Phaser.Display.ColorMatrix | null;
+}
 
 /**
- * Story dialogue: one line at a time with the speaker's name and a
- * placeholder portrait, or italic narration with neither. Tap or Space advances. Skip ends the scene, but stops
- * at any choice still ahead so story flags are always set.
+ * Story dialogue on a side-on stage. The scene's characters stand side by
+ * side in front view; the speaker steps forward at full brightness while the
+ * others dim, and narration dims everyone. Tap or Space advances. Skip ends
+ * the scene, but stops at any choice still ahead so story flags are always set.
  */
 export class DialogueScene extends Phaser.Scene {
   private lines: DialogueLine[] = [];
@@ -50,8 +66,8 @@ export class DialogueScene extends Phaser.Scene {
   private then!: NextScene;
   private openedAt = 0;
   private pressed = false; // a pointer went down inside this scene
-  private panel!: Phaser.GameObjects.Graphics;
-  private portrait!: Phaser.GameObjects.Graphics;
+  private actors = new Map<string, Actor>();
+  private boxBottom = 0;
   private nameText!: Phaser.GameObjects.Text;
   private bodyText!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
@@ -70,25 +86,37 @@ export class DialogueScene extends Phaser.Scene {
     this.index = -1;
     this.pressed = false;
     this.choiceButtons = [];
+    this.actors = new Map();
     this.openedAt = this.time.now;
 
     const cx = GAME_WIDTH / 2;
     const bg = data.overlay
-      ? this.add.rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.55)
+      ? this.add.rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
       : this.add.rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, COLORS.background, 1);
     bg.setInteractive();
     bg.on('pointerdown', () => (this.pressed = true));
     bg.on('pointerup', () => this.pressed && this.advance());
-    if (!data.overlay) this.drawHarbor();
+    drawStage(this.add.graphics(), dialogue.stage);
 
-    this.panel = this.add.graphics();
-    this.portrait = this.add.graphics();
-    this.nameText = this.add.text(0, 0, '', { fontFamily: FONT_BOLD, fontSize: '26px', color: '#ffffff' }).setOrigin(0, 0.5);
-    this.bodyText = this.add.text(PANEL_X + PAD, 0, '', {
-      fontFamily: FONT, fontSize: '26px', color: '#ffffff', lineSpacing: 8, wordWrap: { width: TEXT_W, useAdvancedWrap: true },
-    });
-    this.hint = this.add.text(PANEL_X + PANEL_W - PAD, PANEL_BOTTOM - HINT_H / 2 - 4, 'Tap to continue', { fontFamily: FONT, fontSize: '18px', color: '#b5b7c0' }).setOrigin(1, 0.5);
+    for (const place of dialogue.cast) {
+      const look = place.id === PLAYER_CAST_ID ? equippedLook() : castLook(place.id);
+      const character = new Character(this, place.x, FLOOR_Y, look, { view: 'front' }).setScale(STAGE_SCALE).setDepth(10);
+      character.setVisible(!place.offstage);
+      this.actors.set(place.id, { character, x: place.x, on: !place.offstage, brightness: this.addBrightness(character) });
+    }
+
+    this.nameText = this.add.text(BOX_X + PAD, 0, '', { fontFamily: FONT_BOLD, fontSize: '26px', color: '#ffffff' }).setDepth(20);
+    this.bodyText = this.add
+      .text(BOX_X + PAD, 0, '', { fontFamily: FONT, fontSize: '26px', color: '#ffffff', lineSpacing: 8, wordWrap: { width: TEXT_W, useAdvancedWrap: true } })
+      .setDepth(20);
+    this.layoutBox();
+    this.hint = this.add
+      .text(BOX_X + BOX_W - PAD, this.boxBottom - HINT_H / 2 - 4, 'Tap to continue', { fontFamily: FONT, fontSize: '18px', color: '#b5b7c0' })
+      .setOrigin(1, 0.5)
+      .setDepth(20);
     this.skip = makeButton(this, GAME_WIDTH - 80, 45, 'Skip', () => this.skipAhead(), 120, 50);
+    this.skip.bg.setDepth(30);
+    this.skip.label.setDepth(30);
 
     const kb = this.input.keyboard!;
     kb.on('keydown-SPACE', () => this.advance());
@@ -103,6 +131,28 @@ export class DialogueScene extends Phaser.Scene {
     });
 
     this.show(0);
+  }
+
+  /** A brightness filter for dimming, or null on the canvas renderer (which falls back to alpha). */
+  private addBrightness(character: Character): Phaser.Display.ColorMatrix | null {
+    if (this.game.renderer.type !== Phaser.WEBGL) return null;
+    character.enableFilters();
+    return character.filters!.internal.addColorMatrix().colorMatrix;
+  }
+
+  /** Measures every line once and draws the box at the height the longest one needs. */
+  private layoutBox(): void {
+    let tallest = 0;
+    for (const line of this.lines) {
+      this.bodyText.setFontStyle(line.speaker ? '' : 'italic').setText(line.text);
+      tallest = Math.max(tallest, (line.speaker ? NAME_H : 0) + this.bodyText.height);
+    }
+    const wanted = BOX_TOP + PAD + tallest + 12 + HINT_H;
+    if (import.meta.env.DEV && wanted > BOX_MAX_BOTTOM) console.warn('Dialogue: the longest line does not fit below the stage; shorten it.');
+    this.boxBottom = Math.min(BOX_MAX_BOTTOM, wanted);
+    const g = this.add.graphics().setDepth(19);
+    g.fillStyle(0x10121a, 1).fillRect(BOX_X, BOX_TOP, BOX_W, this.boxBottom - BOX_TOP);
+    g.lineStyle(3, 0xffffff, 0.5).strokeRect(BOX_X, BOX_TOP, BOX_W, this.boxBottom - BOX_TOP);
   }
 
   private ready(): boolean {
@@ -124,6 +174,10 @@ export class DialogueScene extends Phaser.Scene {
     if (!this.ready() || this.line?.choices) return;
     const flags = getFlags();
     const next = this.lines.findIndex((l, i) => i > this.index && l.choices && matches(l.if, flags));
+    // Lines skipped over still move people on and off, so a choice sees the right stage.
+    for (let i = this.index + 1; i < (next < 0 ? this.lines.length : next); i++) {
+      if (matches(this.lines[i].if, flags)) this.moveActors(this.lines[i], false);
+    }
     this.show(next < 0 ? this.lines.length : next);
   }
 
@@ -149,29 +203,71 @@ export class DialogueScene extends Phaser.Scene {
       this.finish();
       return;
     }
-    // Narration has no speaker: no portrait or name, italic text from the top of the panel.
+
+    this.moveActors(line, true);
+    this.spotlight(line.speaker);
+
+    // Narration has no speaker: no name, italic text from the top of the box.
     const who = line.speaker !== undefined ? CAST[line.speaker] : undefined;
-    this.bodyText.setFontStyle(who ? '' : 'italic').setText(line.text);
-    const textOffset = who ? PAD + PORTRAIT + 14 : PAD + 4;
-    const wanted = textOffset + this.bodyText.height + 12 + HINT_H;
-    const top = Math.max(PANEL_MAX_TOP, PANEL_BOTTOM - Math.max(who ? PANEL_MIN_H : NARRATION_MIN_H, wanted));
-    if (import.meta.env.DEV && PANEL_BOTTOM - top < wanted) console.warn(`Dialogue line ${this.index} is too long for the screen: ${line.text}`);
-    this.panel.clear().fillStyle(0x10121a, 0.94).fillRect(PANEL_X, top, PANEL_W, PANEL_BOTTOM - top);
-    this.panel.lineStyle(3, 0xffffff, 0.5).strokeRect(PANEL_X, top, PANEL_W, PANEL_BOTTOM - top);
-    this.bodyText.setY(top + textOffset);
-    this.drawPortrait(who, top);
-    this.nameText.setText(who ? `${who.name}:` : '').setPosition(PANEL_X + PAD + PORTRAIT + 18, top + PAD + PORTRAIT / 2);
+    this.nameText.setText(who ? `${who.name}:` : '').setColor(who?.color ?? '#ffffff').setY(BOX_TOP + PAD);
+    this.bodyText
+      .setFontStyle(who ? '' : 'italic')
+      .setText(line.text)
+      .setY(BOX_TOP + PAD + (who ? NAME_H : 0));
 
     const choices = line.choices ?? [];
     this.hint.setVisible(choices.length === 0);
     this.skip.bg.setVisible(choices.length === 0);
     this.skip.label.setVisible(choices.length === 0);
-    // Choices stack upward from just above the panel.
+    // Choices stack under the box, moved up if the box leaves too little room.
+    const first = Math.min(this.boxBottom + 50, GAME_HEIGHT - 44 - (choices.length - 1) * 76);
     choices.forEach((c, i) => {
-      const y = top - 50 - (choices.length - 1 - i) * 76;
-      this.choiceButtons.push(makeButton(this, GAME_WIDTH / 2, y, `${i + 1}. ${c.text}`, () => this.choose(i), GAME_WIDTH - 60, 64));
+      const b = makeButton(this, GAME_WIDTH / 2, first + i * 76, `${i + 1}. ${c.text}`, () => this.choose(i), GAME_WIDTH - 60, 64);
+      b.bg.setDepth(25);
+      b.label.setDepth(25).setFontSize(22);
+      this.choiceButtons.push(b);
     });
-    for (const b of this.choiceButtons) b.label.setFontSize(22);
+  }
+
+  /** Applies a line's "exit" and "enter". Walks unless animate is false. */
+  private moveActors(line: DialogueLine, animate: boolean): void {
+    for (const id of line.exit ?? []) {
+      const a = this.actors.get(id);
+      if (!a?.on) continue;
+      a.on = false;
+      this.tweens.killTweensOf(a.character);
+      if (!animate) {
+        a.character.setVisible(false);
+        continue;
+      }
+      this.tweens.add({ targets: a.character, x: offstageX(a.x), duration: MOVE_MS, ease: 'Sine.easeIn', onComplete: () => a.character.setVisible(false) });
+    }
+    for (const id of line.enter ?? []) {
+      const a = this.actors.get(id);
+      if (!a || a.on) continue;
+      a.on = true;
+      this.tweens.killTweensOf(a.character);
+      a.character.setVisible(true).setX(animate ? offstageX(a.x) : a.x);
+      if (animate) this.tweens.add({ targets: a.character, x: a.x, duration: MOVE_MS, ease: 'Sine.easeOut' });
+    }
+  }
+
+  /** The speaker steps forward at full brightness; everyone else dims. No speaker on stage dims everyone. */
+  private spotlight(speaker: string | undefined): void {
+    for (const [id, a] of this.actors) {
+      const lit = id === speaker && a.on;
+      a.character.setDepth(lit ? 11 : 10);
+      if (a.brightness) a.brightness.brightness(lit ? 1 : DIM);
+      else a.character.setAlpha(lit ? 1 : 0.55);
+      // Only y and scale here, so a walk-on tween on x keeps running.
+      this.tweens.add({
+        targets: a.character,
+        y: FLOOR_Y + (lit ? STEP_FORWARD : 0),
+        scale: STAGE_SCALE * (lit ? STEP_SCALE : 1),
+        duration: 160,
+        ease: 'Sine.easeOut',
+      });
+    }
   }
 
   private finish(): void {
@@ -183,56 +279,52 @@ export class DialogueScene extends Phaser.Scene {
       this.scene.start(key, data);
     }
   }
-
-  private drawPortrait(who: CastMember | undefined, top: number): void {
-    const g = this.portrait.clear();
-    if (!who) return;
-    const x = PANEL_X + PAD;
-    const y = top + PAD;
-    g.fillStyle(0x000000, 0.35).fillRoundedRect(x, y, PORTRAIT, PORTRAIT, 10);
-    g.fillStyle(Phaser.Display.Color.HexStringToColor(who.color).color, 1).lineStyle(3, 0xffffff, 0.85);
-    drawShape(g, who.shape, x + PORTRAIT / 2, y + PORTRAIT / 2, PORTRAIT * 0.36);
-  }
-
-  /** A simple skyline and water line behind standalone scenes. */
-  private drawHarbor(): void {
-    const g = this.add.graphics();
-    g.fillStyle(0x2a3550, 1).fillRect(0, 0, GAME_WIDTH, HORIZON);
-    const roofs = [[0, 330, 90], [90, 260, 70], [160, 370, 110], [270, 300, 80], [350, 230, 95], [445, 340, 95]];
-    g.fillStyle(0x1d2438, 1);
-    for (const [x, top, w] of roofs) g.fillRect(x, top, w, HORIZON - top);
-    g.fillStyle(0xf2c94c, 0.5);
-    for (const [x, top, w] of roofs) {
-      for (let wy = top + 25; wy < HORIZON - 60; wy += 45) g.fillRect(x + w / 2 - 8, wy, 16, 20);
-    }
-    g.fillStyle(0x23476b, 1).fillRect(0, HORIZON - 50, GAME_WIDTH, GAME_HEIGHT - HORIZON + 50);
-  }
 }
 
-function drawShape(g: Phaser.GameObjects.Graphics, shape: PortraitShape, x: number, y: number, r: number): void {
-  const poly = (n: number, start: number) => {
-    const pts: Phaser.Math.Vector2[] = [];
-    for (let i = 0; i < n; i++) {
-      const a = start + (i / n) * Math.PI * 2;
-      pts.push(new Phaser.Math.Vector2(x + Math.cos(a) * r, y + Math.sin(a) * r));
+/** Where a character walks on from and off to: the nearer side of the screen. */
+function offstageX(x: number): number {
+  return x < GAME_WIDTH / 2 ? -90 : GAME_WIDTH + 90;
+}
+
+/** Flat silhouette backdrops for the stage, filling y 0..STAGE_H. */
+function drawStage(g: Phaser.GameObjects.Graphics, stage: StageName): void {
+  const w = GAME_WIDTH;
+  if (stage === 'street') {
+    g.fillStyle(0x8fb8d8, 1).fillRect(0, 0, w, STAGE_H); // morning sky
+    g.fillStyle(0xb9d3e6, 1).fillRect(0, 230, w, 120);
+    // Far rooftops, then the near terrace with windows and a lamppost.
+    g.fillStyle(0x7a8fa6, 1);
+    for (const [x, top, bw] of [[0, 150, 110], [100, 120, 90], [180, 170, 120], [290, 110, 100], [380, 160, 90], [460, 130, 80]]) g.fillRect(x, top, bw, 392 - top);
+    g.fillStyle(0x4f5d73, 1);
+    for (const [x, top, bw] of [[0, 230, 150], [140, 200, 130], [260, 250, 140], [390, 215, 150]]) {
+      g.fillRect(x, top, bw, 392 - top);
+      g.fillStyle(0x3c475a, 1).fillTriangle(x, top, x + bw, top, x + bw / 2, top - 30);
+      g.fillStyle(0xf2d27a, 0.55);
+      for (let wy = top + 25; wy < 380; wy += 55) for (let wx = x + 20; wx < x + bw - 30; wx += 45) g.fillRect(wx, wy, 22, 28);
+      g.fillStyle(0x4f5d73, 1);
     }
-    g.fillPoints(pts, true).strokePoints(pts, true);
-  };
-  switch (shape) {
-    case 'circle':
-      g.fillCircle(x, y, r).strokeCircle(x, y, r);
-      break;
-    case 'square':
-      g.fillRect(x - r * 0.85, y - r * 0.85, r * 1.7, r * 1.7).strokeRect(x - r * 0.85, y - r * 0.85, r * 1.7, r * 1.7);
-      break;
-    case 'diamond':
-      poly(4, -Math.PI / 2);
-      break;
-    case 'triangle':
-      poly(3, -Math.PI / 2);
-      break;
-    case 'hexagon':
-      poly(6, 0);
-      break;
+    g.fillStyle(0x2f3542, 1).fillRect(480, 260, 6, 150).fillRoundedRect(468, 252, 30, 12, 4); // lamppost
+    g.fillStyle(0x8d8f99, 1).fillRect(0, 392, w, STAGE_H - 392); // pavement
+    g.fillStyle(0x767884, 1).fillRect(0, 392, w, 6);
+    for (let x = 0; x < w; x += 90) g.fillRect(x, 398, 3, STAGE_H - 398);
+  } else {
+    g.fillStyle(0x3a1f1a, 1).fillRect(0, 0, w, STAGE_H); // brick wall
+    g.fillStyle(0x4a2a22, 1);
+    for (let y = 10; y < 392; y += 28) {
+      const shift = (y / 28) % 2 ? 0 : 30;
+      for (let x = -60 + shift; x < w; x += 60) g.fillRect(x + 3, y, 54, 22);
+    }
+    // Arched doorway, a hanging lamp and instrument silhouettes on the wall.
+    g.fillStyle(0x1d0f0c, 1).fillRect(210, 210, 120, 182).fillCircle(270, 210, 60);
+    g.fillStyle(0x2a2a2a, 1).fillRect(268, 0, 4, 90);
+    g.fillStyle(0xf2c94c, 0.9).fillTriangle(250, 110, 290, 110, 270, 86);
+    g.fillStyle(0xf2c94c, 0.12).fillTriangle(180, 392, 360, 392, 270, 110);
+    g.fillStyle(0x2a1410, 1);
+    g.fillCircle(90, 200, 34).fillRect(84, 120, 12, 80); // tuba bell and pipe
+    g.fillRect(410, 150, 90, 14).fillCircle(505, 157, 20); // trumpet
+    g.fillCircle(455, 290, 30).fillRect(447, 250, 16, 40); // drum
+    g.fillStyle(0x2b1a14, 1).fillRect(0, 392, w, STAGE_H - 392); // wooden floor
+    g.fillStyle(0x23140f, 1);
+    for (let y = 400; y < STAGE_H; y += 22) g.fillRect(0, y, w, 3);
   }
 }

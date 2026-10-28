@@ -3,27 +3,57 @@ import { ITEMS, type ShopItem } from '../data/items';
 
 type G = Phaser.GameObjects.Graphics;
 
-// All cosmetics draw in local player space, top-down, facing up (negative y),
-// centred on (0, 0). The head is a circle of radius 8 at (0, 0); shoulders span
-// about x -14..14; hands sit at (+-15, 2). Signs are held ahead of the
-// player and may reach up to y -32. Built-in items live in the tables below;
-// shop items come from src/data/items.json and are drawn by the shape
-// recipes at the bottom of this file.
+// Every cosmetic has two drawings:
+//
+// draw (top-down, in the game): local player space facing up (negative y),
+// centred on (0, 0). The head is a circle of radius 8 at (0, 0); shoulders
+// span about x -14..14; hands sit at (+-15, 2). Signs are held ahead of the
+// player and may reach up to y -32.
+//
+// front (full body facing the viewer, in dialogue and the locker): feet on
+// y 0, x centred. Legs and shoes y -20..0, torso x -11..11 and y -44..-18,
+// sleeves x +-10..16 down to y -27, hands at (+-13, -24), head a circle of
+// radius 9 at (0, -53), top of the head at y -62. Signs are held in the
+// right-hand side hand at (13, -24) and may reach up to y -100.
+//
+// Built-in items live in the tables below; shop items come from
+// src/data/items.json and are drawn by the shape recipes at the bottom.
+
+// Front-view anchor points, shared by the body and the recipes.
+export const FRONT = { headY: -53, headR: 9, handX: 13, handY: -24, torsoTop: -44, torsoBottom: -18 } as const;
 
 export interface BodyStyle {
   skin: number;
 }
 
-export interface OutfitStyle {
+/** A cosmetic: a top-down drawing and a front-view drawing. */
+export interface ItemStyle {
   draw: (g: G) => void;
+  front: (g: G) => void;
 }
 
-export interface HatStyle {
-  draw: (g: G) => void;
+export type OutfitStyle = ItemStyle;
+export type HatStyle = ItemStyle;
+export type SignStyle = ItemStyle;
+
+/** Torso and sleeves in front view. Most outfits start from this. */
+function shirtFront(g: G, color: number, trim: number): void {
+  g.fillStyle(color, 1);
+  g.fillRoundedRect(-16, -43, 6, 17, 3).fillRoundedRect(10, -43, 6, 17, 3);
+  g.fillRoundedRect(-11, -44, 22, 27, 5);
+  g.lineStyle(1.5, trim, 1).strokeRoundedRect(-11, -44, 22, 27, 5);
+  g.strokeRoundedRect(-16, -43, 6, 17, 3).strokeRoundedRect(10, -43, 6, 17, 3);
+  // Neckline.
+  g.fillStyle(trim, 1).fillTriangle(-4, -44, 4, -44, 0, -39);
 }
 
-export interface SignStyle {
-  draw: (g: G) => void;
+/** A domed cap over the top of the head, from y -53 up. */
+function dome(g: G, color: number, r = 9.8, y = -54): void {
+  g.fillStyle(color, 1);
+  g.beginPath();
+  g.arc(0, y, r, Math.PI, 0, false);
+  g.closePath();
+  g.fillPath();
 }
 
 export const BODIES: Record<string, BodyStyle> = {
@@ -40,6 +70,7 @@ function shirt(color: number, trim: number): OutfitStyle {
       g.lineStyle(2, trim, 1);
       g.strokeEllipse(0, 2, 30, 18);
     },
+    front: (g) => shirtFront(g, color, trim),
   };
 }
 
@@ -50,6 +81,12 @@ function hoodie(color: number, trim: number, hood: number): OutfitStyle {
       // Hood hanging behind the neck.
       g.fillStyle(hood, 1);
       g.fillEllipse(0, 9, 16, 8);
+    },
+    front: (g) => {
+      // Hood bunched behind the neck, then the body and a front pocket.
+      g.fillStyle(hood, 1).fillEllipse(0, -44, 20, 7);
+      shirtFront(g, color, trim);
+      g.fillStyle(hood, 1).fillRoundedRect(-7, -27, 14, 6, 2);
     },
   };
 }
@@ -70,6 +107,12 @@ export const OUTFITS: Record<string, OutfitStyle> = {
       g.fillStyle(0xb8901f, 1);
       g.fillRect(-1, -6, 2, 14);
     },
+    front: (g) => {
+      // Long coat down to the knees, with a button line.
+      g.fillStyle(0xf2c94c, 1).fillRoundedRect(-12, -44, 24, 34, 5);
+      shirtFront(g, 0xf2c94c, 0xb8901f);
+      g.fillStyle(0xb8901f, 1).fillRect(-0.75, -40, 1.5, 30);
+    },
   },
   // The player's default. Kept out of PROTESTOR_OUTFITS so the player stands out in a crowd.
   'vest-magenta': {
@@ -78,6 +121,12 @@ export const OUTFITS: Record<string, OutfitStyle> = {
       g.fillStyle(0xffffff, 1);
       g.fillRect(-9, -4, 4, 12);
       g.fillRect(5, -4, 4, 12);
+    },
+    front: (g) => {
+      shirtFront(g, 0xff3fa4, 0xffffff);
+      // Reflective strips: two up the front, one across.
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(-8, -42, 3, 24).fillRect(5, -42, 3, 24).fillRect(-11, -27, 22, 3);
     },
   },
 };
@@ -90,6 +139,11 @@ function beanie(color: number, bobble: number): HatStyle {
       g.fillStyle(bobble, 1);
       g.fillCircle(0, 0, 3);
     },
+    front: (g) => {
+      dome(g, color, 10.5, -55);
+      g.fillStyle(darken(color), 1).fillRoundedRect(-10.5, -57, 21, 5, 2); // folded cuff
+      g.fillStyle(bobble, 1).fillCircle(0, -66, 3.5);
+    },
   };
 }
 
@@ -100,6 +154,10 @@ function cap(color: number): HatStyle {
       g.fillCircle(0, 1, 8.5);
       // Brim points forward (up).
       g.fillEllipse(0, -8, 12, 7);
+    },
+    front: (g) => {
+      dome(g, color);
+      g.fillStyle(darken(color), 1).fillEllipse(0, -54, 24, 5); // brim toward the viewer
     },
   };
 }
@@ -112,11 +170,17 @@ function bucket(color: number, top: number): HatStyle {
       g.fillStyle(top, 1);
       g.fillCircle(0, 0, 7.5);
     },
+    front: (g) => {
+      g.fillStyle(top, 1).fillRoundedRect(-8, -65, 16, 11, 3);
+      g.fillStyle(color, 1).fillEllipse(0, -55, 28, 6);
+    },
   };
 }
 
+const NOTHING: ItemStyle = { draw: () => {}, front: () => {} };
+
 export const HATS: Record<string, HatStyle> = {
-  none: { draw: () => {} },
+  none: NOTHING,
   beanie: beanie(0x4f6fe0, 0xffffff),
   'beanie-red': beanie(0xc0392b, 0xf2f2f2),
   'beanie-grey': beanie(0x6b6e78, 0x2b2d33),
@@ -128,7 +192,7 @@ export const HATS: Record<string, HatStyle> = {
 };
 
 export const SIGNS: Record<string, SignStyle> = {
-  none: { draw: () => {} },
+  none: NOTHING,
 };
 
 export interface PlayerLook {
@@ -153,6 +217,81 @@ export function randomProtestorLook(): PlayerLook {
     sign: 'none',
   };
 }
+
+// --- Story cast ---------------------------------------------------------------
+// Worn only by dialogue characters (src/story/cast.json). Added after the
+// protestor pools above, so crowds never wear them.
+
+/** Hair, drawn in the hat layer for cast members without a hat. */
+function hair(color: number, bun: boolean): HatStyle {
+  return {
+    draw: (g) => {
+      g.fillStyle(color, 1).fillCircle(0, 1.5, 8.5);
+      if (bun) g.fillCircle(0, 9, 3.5);
+    },
+    front: (g) => {
+      dome(g, color, 9.8, -53);
+      g.fillStyle(color, 1).fillRect(-9.8, -54, 3, 7).fillRect(6.8, -54, 3, 7);
+      if (bun) g.fillCircle(0, -65, 4.5);
+    },
+  };
+}
+
+const CAST_OUTFITS: Record<string, OutfitStyle> = {
+  'squad-uniform': {
+    draw: shirt(0x6f7480, 0x40434c).draw,
+    front: (g) => {
+      shirtFront(g, 0x6f7480, 0x40434c);
+      g.fillStyle(0x2b2d33, 1).fillRect(-11, -24, 22, 3); // belt
+      g.fillStyle(0xf2c94c, 1).fillCircle(-5, -36, 2.2); // badge
+      // A decibel meter clipped to the belt.
+      g.fillStyle(0x1d1f2b, 1).fillRoundedRect(3, -30, 7, 9, 1.5);
+      g.fillStyle(0x7be08f, 1).fillRect(4.5, -28.5, 4, 2.5);
+    },
+  },
+  'gus-apron': {
+    draw: shirt(0xeeeeee, 0x5ca9e6).draw,
+    front: (g) => {
+      shirtFront(g, 0xeeeeee, 0xa8a8a8);
+      g.fillStyle(0x5ca9e6, 1).fillRoundedRect(-9, -38, 18, 30, 3); // apron to the knees
+      g.fillStyle(0x3d7fb3, 1).fillRect(-9, -26, 18, 1.5);
+    },
+  },
+  'ruby-coat': {
+    draw: shirt(0xc0392b, 0x7e2219).draw,
+    front: (g) => {
+      g.fillStyle(0xc0392b, 1).fillRoundedRect(-13, -44, 26, 38, 5); // long coat
+      shirtFront(g, 0xc0392b, 0x7e2219);
+      g.fillStyle(0x1d1f2b, 1).fillTriangle(-4, -44, 4, -44, 0, -30);
+      g.fillStyle(0xf2c94c, 1).fillCircle(-13, -24.5, 1.4).fillCircle(13, -24.5, 1.4); // brass rings
+    },
+  },
+  'quill-suit': {
+    draw: shirt(0x5b3f8a, 0x3a2759).draw,
+    front: (g) => {
+      shirtFront(g, 0x5b3f8a, 0x3a2759);
+      g.fillStyle(0xffffff, 1).fillTriangle(-5, -44, 5, -44, 0, -32);
+      g.fillStyle(0xd4a017, 1).fillTriangle(-1.5, -42, 1.5, -42, 0, -33); // tie
+    },
+  },
+};
+
+const CAST_HATS: Record<string, HatStyle> = {
+  'squad-cap': {
+    draw: cap(0x40434c).draw,
+    front: (g) => {
+      dome(g, 0x6f7480, 10.5, -56);
+      g.fillStyle(0x40434c, 1).fillRect(-11, -58, 22, 4);
+      g.fillStyle(0x1d1f2b, 1).fillEllipse(0, -54, 24, 5);
+      g.fillStyle(0xf2c94c, 1).fillCircle(0, -61, 2);
+    },
+  },
+  'hair-bun': hair(0x2b1d14, true),
+  'hair-bob': hair(0xb07a3a, false),
+};
+
+Object.assign(OUTFITS, CAST_OUTFITS);
+Object.assign(HATS, CAST_HATS);
 
 // --- Shop items --------------------------------------------------------------
 
@@ -257,16 +396,102 @@ function darken(color: number): number {
   return c.color;
 }
 
-function shopDraw(item: ShopItem): (g: G) => void {
-  const recipes = { hat: HAT_SHAPES, outfit: OUTFIT_SHAPES, sign: SIGN_SHAPES }[item.category];
-  const recipe = recipes[item.shape];
-  const color = Phaser.Display.Color.HexStringToColor(item.color).color;
-  const accent = Phaser.Display.Color.HexStringToColor(item.accent).color;
-  return (g) => recipe(g, color, accent);
+// Front-view recipes, in the front-view space described at the top of the file.
+const FRONT_HAT_SHAPES: Record<string, Recipe> = {
+  bandana: (g, c, a) => {
+    dome(g, c, 10, -53);
+    g.fillStyle(c, 1).fillRect(-10, -54, 20, 3);
+    // Knot and tails at the side of the head.
+    g.fillCircle(10, -53, 2.5).fillTriangle(10, -53, 16, -47, 13, -45).fillTriangle(10, -53, 15, -55, 16, -51);
+    g.fillStyle(a, 1);
+    for (const [x, y] of [[-5, -58], [2, -60], [6, -56], [-1, -55]]) g.fillCircle(x, y, 1.2);
+  },
+  beret: (g, c, a) => {
+    g.fillStyle(c, 1).fillEllipse(-2, -60, 26, 10);
+    g.fillRect(-9, -60, 18, 4);
+    g.fillStyle(a, 1).fillCircle(-2, -65.5, 1.8);
+  },
+  hardhat: (g, c, a) => {
+    dome(g, c, 11, -56);
+    g.fillStyle(a, 1).fillRoundedRect(-15, -57, 30, 3.5, 1.5); // brim
+    g.fillRect(-1.5, -67, 3, 10); // ridge
+  },
+  crown: (g, c, a) => {
+    g.fillStyle(c, 1).fillRect(-9, -64, 18, 6);
+    g.fillTriangle(-9, -64, -5, -64, -8, -72).fillTriangle(-2.5, -64, 2.5, -64, 0, -74).fillTriangle(5, -64, 9, -64, 8, -72);
+    g.fillStyle(a, 1).fillCircle(-5, -61, 1.6).fillCircle(0, -61, 1.6).fillCircle(5, -61, 1.6).fillCircle(0, -74, 1.4);
+  },
+};
+
+const FRONT_OUTFIT_SHAPES: Record<string, Recipe> = {
+  tracksuit: (g, c, a) => {
+    shirtFront(g, c, darken(c));
+    g.fillStyle(a, 1);
+    g.fillRect(-14, -42, 2, 15).fillRect(12, -42, 2, 15); // stripes down the arms
+    g.fillRect(-0.75, -40, 1.5, 22); // zip
+  },
+  jersey: (g, c, a) => {
+    shirtFront(g, c, a);
+    // Big number 7 on the chest.
+    g.fillStyle(a, 1).fillRect(-4, -38, 8, 2.5).fillTriangle(4, -38, 1, -26, 3.5, -38);
+    g.fillRect(-16, -31, 6, 2).fillRect(10, -31, 6, 2); // sleeve bands
+  },
+  poncho: (g, c, a) => {
+    // Covers the arms; the hands poke out under it.
+    g.fillStyle(c, 1).fillTriangle(0, -46, -19, -24, 19, -24);
+    g.fillRect(-19, -30, 38, 6);
+    g.fillStyle(a, 1).fillRect(-17, -32, 34, 2.5);
+    for (let x = -16; x <= 16; x += 6.4) g.fillTriangle(x - 2.5, -24, x + 2.5, -24, x, -20);
+  },
+  cape: (g, c, a) => {
+    // Cape edges spread out behind the shoulders, then a plain top and a clasp.
+    g.fillStyle(c, 1).fillTriangle(-10, -44, -22, -8, -10, -8).fillTriangle(10, -44, 22, -8, 10, -8);
+    shirtFront(g, a, darken(a));
+    g.fillStyle(c, 1).fillCircle(-8, -42, 2.5).fillCircle(8, -42, 2.5);
+  },
+};
+
+const FRONT_SIGN_SHAPES: Record<string, Recipe> = {
+  placard: (g, c, a) => {
+    g.fillStyle(0x8a6a44, 1).fillRect(11.5, -72, 3, 50);
+    g.fillStyle(c, 1).fillRect(-4, -92, 34, 22);
+    g.lineStyle(1.5, darken(c), 1).strokeRect(-4, -92, 34, 22);
+    g.fillStyle(a, 1).fillRect(0, -87, 26, 3).fillRect(0, -80, 18, 3);
+  },
+  lollipop: (g, c, a) => {
+    g.fillStyle(0x6b6e78, 1).fillRect(11.5, -72, 3, 50);
+    g.fillStyle(c, 1).fillCircle(13, -82, 12);
+    g.lineStyle(3, a, 1).strokeCircle(13, -82, 10).lineBetween(6, -89, 20, -75);
+  },
+  flag: (g, c, a) => {
+    g.fillStyle(0xd8d8d8, 1).fillRect(12, -100, 2.5, 78);
+    g.fillStyle(c, 1).fillTriangle(14.5, -100, 14.5, -80, 36, -90);
+    g.fillStyle(a, 1).fillCircle(21, -90, 3);
+  },
+  banner: (g, c, a) => {
+    // Held up in both hands, stretched across above the head.
+    g.fillStyle(0x8a6a44, 1).fillRect(-14.5, -70, 3, 48).fillRect(11.5, -70, 3, 48);
+    g.fillStyle(c, 1).fillRect(-22, -86, 44, 18);
+    g.lineStyle(1.5, darken(c), 1).strokeRect(-22, -86, 44, 18);
+    g.fillStyle(a, 1);
+    for (let x = -17; x <= 13; x += 7.5) g.fillRect(x, -79.5, 4, 5);
+  },
+};
+
+function hex(color: string): number {
+  return Phaser.Display.Color.HexStringToColor(color).color;
+}
+
+function shopStyle(item: ShopItem): ItemStyle {
+  const top = { hat: HAT_SHAPES, outfit: OUTFIT_SHAPES, sign: SIGN_SHAPES }[item.category][item.shape];
+  const front = { hat: FRONT_HAT_SHAPES, outfit: FRONT_OUTFIT_SHAPES, sign: FRONT_SIGN_SHAPES }[item.category][item.front];
+  const color = hex(item.color);
+  const accent = hex(item.accent);
+  return { draw: (g) => top(g, color, accent), front: (g) => front(g, color, accent) };
 }
 
 const TABLES = { hat: HATS, outfit: OUTFITS, sign: SIGNS };
-for (const item of ITEMS) TABLES[item.category][item.id] = { draw: shopDraw(item) };
+for (const item of ITEMS) TABLES[item.category][item.id] = shopStyle(item);
 
 /** The item each category starts with, always owned. */
 export const DEFAULT_ITEMS = { hat: DEFAULT_LOOK.hat, outfit: DEFAULT_LOOK.outfit, sign: DEFAULT_LOOK.sign };

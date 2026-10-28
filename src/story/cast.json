@@ -1,9 +1,9 @@
 {
-  "pip": {"name": "Pip", "color": "#ff3fa4", "shape": "circle"},
-  "gus": {"name": "Gus", "color": "#5ca9e6", "shape": "square"},
-  "hush": {"name": "Sgt. Hush", "color": "#24407a", "shape": "diamond"},
-  "mute": {"name": "Officer Mute", "color": "#4a6fb0", "shape": "diamond"},
-  "quill": {"name": "Mayor Quill", "color": "#8e6bbf", "shape": "hexagon"},
-  "stranger": {"name": "Stranger", "color": "#c0392b", "shape": "triangle"},
-  "ruby": {"name": "Ma Ruby", "color": "#c0392b", "shape": "triangle"}
+  "pip": { "name": "Pip", "color": "#ff7cc4" },
+  "gus": { "name": "Gus", "color": "#7cc0f0", "look": { "body": "medium", "outfit": "gus-apron", "hat": "beanie-grey" } },
+  "hush": { "name": "Sgt. Hush", "color": "#a9b8d6", "look": { "body": "light", "outfit": "squad-uniform", "hat": "squad-cap" } },
+  "mute": { "name": "Officer Mute", "color": "#a9b8d6", "look": { "body": "dark", "outfit": "squad-uniform", "hat": "squad-cap" } },
+  "quill": { "name": "Mayor Quill", "color": "#c3a6ec", "look": { "body": "light", "outfit": "quill-suit", "hat": "hair-bob" } },
+  "stranger": { "name": "Stranger", "color": "#ff8a7a", "look": { "body": "dark", "outfit": "ruby-coat", "hat": "hair-bun" } },
+  "ruby": { "name": "Ma Ruby", "color": "#ff8a7a", "look": { "body": "dark", "outfit": "ruby-coat", "hat": "hair-bun" } }
 }

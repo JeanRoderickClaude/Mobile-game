@@ -32,13 +32,13 @@ The live site is the owner's personal test build. When the owner asks for a feat
 - `docs/story.md`: the story outline (setting, characters, the eight chapters, design rules).
 - `src/scenes/MenuScene.ts`: first screen. Title, the equipped look, coin balance, Play (opens the chapter map) and Locker buttons, and an Easy / Normal difficulty switch. Enter or Space opens the chapter map, L opens the locker.
 - `src/scenes/ChapterMapScene.ts`: the eight chapters by title with their state: Replay (done), Play (open), Coming soon (open but no level yet), Locked. Enter plays the furthest open chapter; Escape or Back returns to the menu.
-- `src/scenes/DialogueScene.ts`: story dialogue. Speaker name with a colon, placeholder portrait, text, choice buttons; narration in italics with no name. The box sits on the bottom edge and grows upward to fit the line. Started standalone (intro, harbor backdrop) or as an overlay on the paused game (outro). Ends by starting or launching the scene it was given.
-- `src/scenes/LockerScene.ts`: the shop. Large character preview, Hats / Outfits / Signs tabs, item grid, Buy / Equip button. Escape or Back returns to the menu.
+- `src/scenes/DialogueScene.ts`: story dialogue on a side-on stage. Top half (y 0..480): a background strip and the scene's characters in full-body front view. Below it: the dialogue box with the speaker name and a colon, text and choice buttons; narration in italics with no name. Started standalone (intro) or as an overlay on the paused game (outro). Ends by starting or launching the scene it was given.
+- `src/scenes/LockerScene.ts`: the shop. Large front-view character preview, Hats / Outfits / Signs tabs, item grid (tiles show items top-down, as they look in a run), Buy / Equip button. Escape or Back returns to the menu.
 - `src/scenes/GameScene.ts`: loads a level with the story flags applied, draws street and obstacles, player input and collision, detection, coins, HUD timer and coin counter, payout at the end. When started with a `chapterIndex` it marks the chapter done on finishing and plays its outro before the result.
 - `src/scenes/ResultScene.ts`: "Caught" / "Route complete" overlay with the coin breakdown. In a chapter: Try again / Replay (skips the intro), "Next chapter" when the next one has a level, and Chapters. Outside a chapter (balance tools): Restart, "Next level" and Menu. Enter, Space or R restart; Escape leaves.
-- `src/entities/Character.ts`: a protestor (player or crowd member), built from stacked layers. Crowd members are baked into one cached image.
+- `src/entities/Character.ts`: a protestor (player or crowd member), built from stacked layers. Top-down view for the game (crowd members are baked into one cached image) or front view (`{ view: 'front' }`) for the dialogue stage and the locker.
 - `src/entities/Crowd.ts`: marching and standing groups of protestors the player can hide in.
-- `src/entities/cosmetics.ts`: tables of bodies (skin tones), outfits, hats and signs, the pools crowd members pick from, and the shape recipes that draw shop items.
+- `src/entities/cosmetics.ts`: tables of bodies (skin tones), outfits, hats and signs, each with a top-down `draw` and a front-view `front`; cast-only outfits and hats (Quiet Squad uniform and cap, Gus's apron, Ruby's coat, the Mayor's suit, hair); the pools crowd members pick from; and the top-down and front-view shape recipes that draw shop items.
 - `src/entities/Coin.ts`: a coin on the street, its idle bob and pickup animation.
 - `src/data/items.json`: the 12 shop items. `src/data/items.ts` describes and checks them.
 - `src/systems/save.ts`: coin balance, owned and equipped items, mirrored to localStorage.
@@ -50,7 +50,7 @@ The live site is the owner's personal test build. When the owner asks for a feat
 - `src/systems/geometry.ts`: ray-vs-rectangle, line of sight, angle helpers.
 - `src/levels/*.json`: level data. `src/levels/types.ts` describes the format; `src/levels/index.ts` loads and checks it; `src/levels/resolve.ts` applies story flags (conditional entries, modifiers).
 - `src/story/chapters.json`: the eight chapters in play order (id, title, level, intro, outro).
-- `src/story/cast.json`: speakers for dialogue (name, colour, portrait shape).
+- `src/story/cast.json`: speakers for dialogue (name, name colour, what they wear on stage).
 - `src/story/dialogue/*.json`: dialogue scenes; the file name is the scene id.
 - `src/story/story.ts`: loads and checks chapters, cast and dialogue; chapter state (done / open / locked) and `startChapter`.
 - `src/story/flags.ts`: story flag and condition types, `matches`.
@@ -69,13 +69,14 @@ The live site is the owner's personal test build. When the owner asks for a feat
 - Officers walk their waypoints at `speed`, wait `pauseMs` at each one, and turn smoothly toward the next leg (also while waiting). `loop` routes return to the first point; `pingpong` routes walk back.
 - Levels are data. Every `src/levels/*.json` file is picked up by `import.meta.glob`. Players reach a level through the chapter that names it in `chapters.json`. The balance tools still start levels by file-name index. Bad data fails at startup with an error naming the file.
 - Story flow: Play → chapter map → chapter intro (if any) → level → on finishing, the chapter is saved as done, then the outro plays over the paused level, then the result screen. Getting caught shows the result screen with no outro. Chapter 1 is always open; each later chapter opens when the one before it is done. Finished chapters replay with full coin payout and play their intro and outro again (Skip ends them). A chapter with no `level` shows "Coming soon" once open.
-- Dialogue: text is 26px at every length and wraps across the full box width (about 34 characters per row). A long line makes the box taller, never the text smaller; the box stops below the Skip button, and in dev a line too long even for that logs a console warning. Tap or Space/Enter advances; Skip or Escape jumps to the next choice ahead, or ends the scene when none is left, so choices cannot be skipped past. While a choice is showing, Skip and tap-to-advance are off; tap a button or press 1-4. Input is ignored for the first 300 ms so a lifted finger or held key from the level does not skip a line. Replaying a chapter and picking differently overwrites the flag.
+- Dialogue stage: the scene's `stage` picks the backdrop (`street` or `cellar`, flat silhouettes). Characters stand with their feet on y 452, drawn in front view at 2.7 times base size. Pip always wears the player's equipped items and stands leftmost. The speaker steps 16 units forward and grows 7 percent at full brightness; everyone else dims to 42 percent brightness with a ColorMatrix filter (alpha on the canvas renderer). Narration, and speakers who are not on stage (the Mayor on a loudspeaker), dim everyone. A line's `enter` and `exit` walk characters on and off from the nearer screen edge in 450 ms.
+- Dialogue box: sits under the stage from y 496 and keeps one height per scene, sized to the scene's longest line (measured when the scene opens), so it never changes height between lines. Text is 26px and wraps across the full box width (about 34 characters per row). The box ends 16 units above the bottom edge at most; in dev a scene whose longest line needs more logs a console warning. Choices stack under the box. Tap or Space/Enter advances; Skip or Escape jumps to the next choice ahead, or ends the scene when none is left, so choices cannot be skipped past. While a choice is showing, Skip and tap-to-advance are off; tap a button or press 1-4. Input is ignored for the first 300 ms so a lifted finger or held key from the level does not skip a line. Replaying a chapter and picking differently overwrites the flag.
 - Crowds: defined per level. Marching groups walk their `path` at `speed` (default 60 percent of `PLAYER_SPEED`, 102) in a loose two-wide column that turns with the path, fade out at the end, and a new group starts at the first point `intervalMs` later. Standing groups shuffle in place at `x, y`. Protestors block nothing: not movement, not line of sight. A faint disc shows each group's `radius` (default `CROWD_RADIUS`, 75).
 - Hiding: the player is hidden while within a group's radius and moving no faster than `HIDE_SPEED_MARGIN` (1.1) times the group's speed, with a floor of `HIDE_SPEED_FLOOR` (25 units/s) so standing groups (speed 0) allow a slow shuffle. Player speed is measured after collision, so pushing into a wall counts as standing. A three-heads icon shows above the player while hidden.
 - The player wears a magenta vest (`vest-magenta`, kept out of the crowd pools) and a white marker ring, so they stay visible in a crowd.
 - Crowd members are baked: `Character` with `{ baked: true }` renders its layers once into a texture per look (2x resolution) and shows one image. This saves about 20 percent of frame time with 32 protestors. Baked members do not swing their hands.
 - Character size: the player and officer containers are drawn at `CHARACTER_SCALE` (1.25). The art stays authored at base size. Collision and the suspicion bar offset scale with it. Vision cones start at the officer's centre, which scaling does not move. Level gaps the player must pass need to be at least 33 units wide (level 1's narrowest is 50).
-- Cosmetics: the player is a `Container` with separate Graphics layers, bottom to top: body (hands), outfit, sign, head (uses the body's skin tone so it sits above the outfit), hat. `setBodyStyle`, `setOutfit`, `setSign` and `setHat` redraw one layer; `setLook` sets all. Items draw in local space, facing up, head at (0, 0). Signs are held ahead of the player and reach up to y -32, so baked textures cover -32..32. Crowd members never carry signs and never wear shop items, so the player stays unique.
+- Cosmetics: the player is a `Container` with separate Graphics layers, bottom to top: body (hands), outfit, sign, head (uses the body's skin tone so it sits above the outfit), hat. The front view has the same layers in the order sign, body (trousers, shoes, hands), outfit, head (with a face), hat, with the feet at (0, 0); its coordinates are described at the top of `cosmetics.ts`. `setBodyStyle`, `setOutfit`, `setSign` and `setHat` redraw one layer; `setLook` sets all. Items draw in local space, facing up, head at (0, 0). Signs are held ahead of the player and reach up to y -32, so baked textures cover -32..32. Crowd members never carry signs and never wear shop items, so the player stays unique.
 - Frame time is capped at 50 ms per update, so a background tab does not teleport the player or officers.
 
 ## Economy
@@ -93,16 +94,17 @@ The live site is the owner's personal test build. When the owner asks for a feat
 `src/data/items.json` is an array. Each entry:
 
 ```json
-{ "id": "hat-bandana", "name": "Bandana", "category": "hat", "price": 120, "shape": "bandana", "color": "#c0392b", "accent": "#f4f4f4" }
+{ "id": "hat-bandana", "name": "Bandana", "category": "hat", "price": 120, "shape": "bandana", "front": "bandana", "color": "#c0392b", "accent": "#f4f4f4" }
 ```
 
 - `id`: unique, stored in saves. Renaming one drops it from existing saves.
 - `category`: `hat`, `outfit` or `sign` (the locker tabs).
 - `price`: whole coins, above 0.
-- `shape`: drawing recipe for that category. Hats: `bandana`, `beret`, `hardhat`, `crown`. Outfits: `tracksuit`, `jersey`, `poncho`, `cape`. Signs: `placard`, `lollipop`, `flag`, `banner`. Recipes live in `cosmetics.ts` (`HAT_SHAPES`, `OUTFIT_SHAPES`, `SIGN_SHAPES`) and take the two colours.
+- `shape`: top-down drawing recipe for that category, used in the game. Hats: `bandana`, `beret`, `hardhat`, `crown`. Outfits: `tracksuit`, `jersey`, `poncho`, `cape`. Signs: `placard`, `lollipop`, `flag`, `banner`. Recipes live in `cosmetics.ts` (`HAT_SHAPES`, `OUTFIT_SHAPES`, `SIGN_SHAPES`) and take the two colours.
+- `front`: front-view drawing recipe, used on the dialogue stage and in the locker preview. The names match the `shape` list; recipes live in `FRONT_HAT_SHAPES`, `FRONT_OUTFIT_SHAPES` and `FRONT_SIGN_SHAPES`. Usually the same as `shape`, but any pairing is allowed.
 - `color`, `accent`: `#rrggbb`.
 
-Adding an item with an existing shape is a JSON-only change. A new shape needs a recipe in `cosmetics.ts` and its name in `SHAPES` in `items.ts`. Bad entries fail at startup with an error naming the entry. The locker shows up to five tiles per tab (the default plus four items); more items per category need a scrolling grid.
+Adding an item with existing shapes is a JSON-only change. A new shape needs a top-down recipe and a front-view recipe in `cosmetics.ts`, and its name in `SHAPES` and `FRONT_SHAPES` in `items.ts`. Built-in items (the defaults, crowd clothes, cast clothes) are tables in `cosmetics.ts` where every entry has `draw` (top-down) and `front`. Bad entries fail at startup with an error naming the entry. The locker shows up to five tiles per tab (the default plus four items); more items per category need a scrolling grid.
 
 ## Level format (short)
 
@@ -180,13 +182,16 @@ Chapters (`src/story/chapters.json`), in play order:
 "outro": [{ "scene": "ch8-end-full", "if": { "helpedRuby": true, "gaveNames": false } }, { "scene": "ch8-end-small" }]
 ```
 
-Cast (`src/story/cast.json`), keyed by speaker id: `{ "pip": { "name": "Pip", "color": "#ff3fa4", "shape": "circle" } }`. Shapes: `circle`, `square`, `diamond`, `triangle`, `hexagon`. The name is shown as "Pip:".
+Cast (`src/story/cast.json`), keyed by speaker id: `{ "hush": { "name": "Sgt. Hush", "color": "#a9b8d6", "look": { "body": "light", "outfit": "squad-uniform", "hat": "squad-cap" } } }`. The name is shown as "Sgt. Hush:" in `color`. `look` takes any of `body`, `outfit`, `hat`, `sign` (ids from the tables in `cosmetics.ts`); left-out parts are light skin, grey tee, no hat, no sign. `pip` must exist; Pip has no `look` and always wears the player's equipped items.
 
 Dialogue (`src/story/dialogue/<id>.json`):
 
 ```json
 {
+  "stage": "cellar",
+  "cast": [{ "id": "pip", "x": 110 }, { "id": "ruby", "x": 290 }, { "id": "hush", "x": 440, "offstage": true }],
   "lines": [
+    { "speaker": "hush", "text": "Nobody move. Nobody hum.", "enter": ["hush"] },
     { "speaker": "ruby", "text": "Grab the tuba or run, kid!", "choices": [
       { "text": "Carry the tuba", "set": { "helpedRuby": true } },
       { "text": "Run", "set": { "helpedRuby": false } }
@@ -197,7 +202,9 @@ Dialogue (`src/story/dialogue/<id>.json`):
 }
 ```
 
-Each line needs `text`. `speaker` is a cast id; leave it out for narration (italic, no name or portrait). `choices` (2 to 4) each set one or more flags when picked. A line with `if` is skipped unless it matches, checked when the scene reaches it, so a choice can decide the lines after it. Write dialogue by the style guide in `docs/story.md` (12 to 16 lines per scene, one to three sentences per line, Pip's thoughts in brackets). Bad data fails at startup naming the file and line.
+`stage` is `street` or `cellar` (drawn in `drawStage` in `DialogueScene.ts`; a new backdrop needs a branch there and its name in `STAGES` in `story.ts`). `cast` lists everyone who appears on stage in the scene, with the centre `x` of their spot (40 to 500); four characters fit at about 120 apart. Pip must be leftmost. `offstage: true` starts a character off stage. A line's `enter` and `exit` list cast ids that walk on or off before the line shows; every id must be in the scene's `cast`. Skip applies the moves of the lines it passes, so a choice sees the right stage.
+
+Each line needs `text`. `speaker` is a cast id; leave it out for narration (italic, no name). `choices` (2 to 4) each set one or more flags when picked. A line with `if` is skipped unless it matches, checked when the scene reaches it, so a choice can decide the lines after it. Write dialogue by the style guide in `docs/story.md` (12 to 16 lines per scene, one to three sentences per line, Pip's thoughts in brackets). Bad data fails at startup naming the file and line.
 
 ## Story flags
 
@@ -210,10 +217,10 @@ Flags in use: none yet. Planned in `docs/story.md`: `taggedVan` (ch3), `helpedRu
 - Manual: walk into a cone (caught after about half a second), stand behind a building inside a cone's range (not caught), reach the finish (time shown).
 - Difficulty and assist: with cleared storage the menu shows Easy selected. A catch takes about 1.5 s on Easy and 0.5 s on Normal. A three-quarter joystick push inside a marching group stays hidden at the group's pace; a full push breaks out.
 - Economy: with cleared storage, collect coins and get caught (Caught screen states the loss, menu balance stays 0); finish a run (balance equals coins plus the stated bonus); buy and equip an item in the locker, start a run (the player wears it); reload (balance, owned and equipped survive).
-- Story: with a v1 save holding coins and an item, reload: coins and item survive and a v2 key appears. The chapter map shows chapter 1 open and 2 to 8 locked. Playing chapter 1 shows the intro; Skip starts the level; finishing plays the outro, then the result; chapter 1 shows Replay and chapter 2 "Coming soon". Replaying still pays coins. A dialogue with a choice stops Skip at the choice, saves the flag, and the flag survives a reload. In an emulated phone (Playwright `devices['iPhone 13']`), read every line: speaker names end with a colon, narration is italic with no name or portrait, and text stays inside the box above "Tap to continue".
+- Story: with a v1 save holding coins and an item, reload: coins and item survive and a v2 key appears. The chapter map shows chapter 1 open and 2 to 8 locked. Playing chapter 1 shows the intro; Skip starts the level; finishing plays the outro, then the result; chapter 1 shows Replay and chapter 2 "Coming soon". Replaying still pays coins. A dialogue with a choice stops Skip at the choice, saves the flag, and the flag survives a reload. In an emulated phone (Playwright `devices['iPhone 13']`), with a hat, outfit and sign equipped, read every line: Pip wears all three on the stage, the speaker is the only one at full brightness (none on narration), the box height never changes within a scene, speaker names end with a colon, narration is italic with no name, text stays above "Tap to continue", and the Stranger walks on in the outro. In the locker, every item previews in front view.
 - Balance: `node tools/ride.mjs src/levels/level-01.json` and the other scripts in `tools/` (see `tools/README.md`). Playwright 1.63.0 is a devDependency; on a new machine run `npx playwright install chromium` once.
 - Other automated checks are ad hoc Playwright scripts against the dev server (`http://localhost:5173/Mobile-game/`), using `window.game.scene.getScene('game')` to place the player and freeze an officer. There is no test runner in the project yet.
 
 ## Not built yet
 
-Chapters 2 to 8 (levels, mechanics, dialogue), sound beyond the coin pickup, art for the dialogue portraits, skin tone choice, saving best times, police chasing or alert states beyond the catch meter, a pause or quit button during a run.
+Chapters 2 to 8 (levels, mechanics, dialogue), sound beyond the coin pickup, final character art (front views are placeholder shapes), skin tone choice, saving best times, police chasing or alert states beyond the catch meter, a pause or quit button during a run.

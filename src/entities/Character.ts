@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { CHARACTER_SCALE } from '../config';
-import { BODIES, DEFAULT_LOOK, HATS, OUTFITS, SIGNS, type PlayerLook } from './cosmetics';
+import { BODIES, DEFAULT_LOOK, FRONT, HATS, OUTFITS, SIGNS, type PlayerLook } from './cosmetics';
 
 /**
  * A protestor: the player or a crowd member. Drawn from stacked layers so each
@@ -16,12 +16,18 @@ import { BODIES, DEFAULT_LOOK, HATS, OUTFITS, SIGNS, type PlayerLook } from './c
  * 30+ protestors cheap to draw, at the cost of the hand swing animation.
  * Movement lives in GameScene (player) and Crowd (others); this class only
  * handles looks and facing.
+ *
+ * The front view (dialogue stage, locker preview) has the same layers drawn
+ * full body facing the viewer, with the feet at (0, 0). Its layer order puts
+ * the sign at the back so the hand holds the stick in front of it.
  */
 export interface CharacterOptions {
   /** Draw the player's marker ring underneath. */
   marker?: boolean;
-  /** Render as one cached image instead of live layers. */
+  /** Render as one cached image instead of live layers. Top-down only. */
   baked?: boolean;
+  /** "top" (default) for the game, "front" for full body facing the viewer. */
+  view?: 'top' | 'front';
 }
 
 const BAKE_RES = 2; // baked textures are drawn at this multiple for sharpness
@@ -34,13 +40,15 @@ export class Character extends Phaser.GameObjects.Container {
   private headLayer: Phaser.GameObjects.Graphics;
   private hatLayer: Phaser.GameObjects.Graphics;
   private look: PlayerLook;
+  private front: boolean;
   private walkTime = 0;
   private image: Phaser.GameObjects.Image | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, look: PlayerLook = DEFAULT_LOOK, options: CharacterOptions = {}) {
     super(scene, x, y);
     this.look = { ...look };
-    if (options.marker) {
+    this.front = options.view === 'front';
+    if (options.marker && !this.front) {
       const ring = scene.add.graphics();
       ring.fillStyle(0xff3fa4, 0.3).fillCircle(0, 2, 21);
       ring.lineStyle(2.5, 0xffffff, 0.9).strokeCircle(0, 2, 21);
@@ -55,7 +63,9 @@ export class Character extends Phaser.GameObjects.Container {
     this.redrawOutfit();
     this.redrawSign();
     this.redrawHat();
-    if (options.baked) {
+    if (this.front) {
+      this.add([this.signLayer, this.bodyLayer, this.outfitLayer, this.headLayer, this.hatLayer]);
+    } else if (options.baked) {
       // Created after the layers are drawn, so the first bake sees every layer.
       this.image = new Phaser.GameObjects.Image(scene, 0, 0, '__DEFAULT').setScale(1 / BAKE_RES);
       this.add(this.image);
@@ -109,7 +119,7 @@ export class Character extends Phaser.GameObjects.Container {
     } else {
       this.walkTime = 0;
     }
-    if (this.image) return;
+    if (this.image || this.front) return;
     const swing = moving ? Math.sin(this.walkTime / 90) * 4 : 0;
     this.drawHands(swing);
   }
@@ -117,17 +127,33 @@ export class Character extends Phaser.GameObjects.Container {
   private redrawBody(): void {
     this.drawHands(0);
     const skin = BODIES[this.look.body].skin;
-    this.headLayer.clear();
-    this.headLayer.fillStyle(skin, 1);
-    this.headLayer.fillCircle(0, 0, 8);
-    this.headLayer.lineStyle(1.5, 0x000000, 0.35);
-    this.headLayer.strokeCircle(0, 0, 8);
+    const h = this.headLayer.clear();
+    if (this.front) {
+      const { headY: y, headR: r } = FRONT;
+      h.fillStyle(skin, 1).fillRect(-3, y + r - 2, 6, 5); // neck
+      h.fillCircle(0, y, r).lineStyle(1.5, 0x000000, 0.35).strokeCircle(0, y, r);
+      h.fillStyle(0x1d1f2b, 1).fillCircle(-3.2, y + 0.5, 1.3).fillCircle(3.2, y + 0.5, 1.3);
+      h.lineStyle(1.2, 0x1d1f2b, 0.8).beginPath().arc(0, y + 3, 2.8, 0.3, Math.PI - 0.3, false).strokePath();
+    } else {
+      h.fillStyle(skin, 1);
+      h.fillCircle(0, 0, 8);
+      h.lineStyle(1.5, 0x000000, 0.35);
+      h.strokeCircle(0, 0, 8);
+    }
     this.bake();
   }
 
   private drawHands(swing: number): void {
     const skin = BODIES[this.look.body].skin;
     const g = this.bodyLayer;
+    if (this.front) {
+      // Trousers, shoes and hands. The outfit draws the sleeves over the top.
+      g.clear();
+      g.fillStyle(0x2b2d42, 1).fillRect(-9, -21, 8, 19).fillRect(1, -21, 8, 19);
+      g.fillStyle(0x1a1a1a, 1).fillEllipse(-5, -1.5, 11, 5).fillEllipse(5, -1.5, 11, 5);
+      g.fillStyle(skin, 1).fillCircle(-FRONT.handX, FRONT.handY, 3.6).fillCircle(FRONT.handX, FRONT.handY, 3.6);
+      return;
+    }
     g.clear();
     g.fillStyle(skin, 1);
     g.fillCircle(-15, 2 - swing, 4.5);
@@ -136,19 +162,22 @@ export class Character extends Phaser.GameObjects.Container {
 
   private redrawOutfit(): void {
     this.outfitLayer.clear();
-    OUTFITS[this.look.outfit].draw(this.outfitLayer);
+    const style = OUTFITS[this.look.outfit];
+    (this.front ? style.front : style.draw)(this.outfitLayer);
     this.bake();
   }
 
   private redrawSign(): void {
     this.signLayer.clear();
-    SIGNS[this.look.sign].draw(this.signLayer);
+    const style = SIGNS[this.look.sign];
+    (this.front ? style.front : style.draw)(this.signLayer);
     this.bake();
   }
 
   private redrawHat(): void {
     this.hatLayer.clear();
-    HATS[this.look.hat].draw(this.hatLayer);
+    const style = HATS[this.look.hat];
+    (this.front ? style.front : style.draw)(this.hatLayer);
     this.bake();
   }
 

@@ -59,9 +59,11 @@ export class LockerScene extends Phaser.Scene {
     this.balance = new CoinLabel(this, 0, 45, getCoins());
     this.alignBalance();
 
-    // Stage with the character, drawn large. Signs reach well above the head.
-    this.add.circle(cx, 290, 140, 0xffffff, 0.06);
-    this.preview = new Character(this, cx, 310, equippedLook()).setScale(5);
+    // The character in front view, drawn large on a floor shadow. Signs reach well above the head.
+    // The tiles below show items top-down, as they look in a run.
+    this.add.circle(cx, 260, 150, 0xffffff, 0.05);
+    this.add.ellipse(cx, 410, 150, 26, 0x000000, 0.3);
+    this.preview = new Character(this, cx, 410, equippedLook(), { view: 'front' }).setScale(3.05);
     this.previewName = this.add.text(cx, 445, '', { fontFamily: FONT_BOLD, fontSize: '26px', color: '#ffffff' }).setOrigin(0.5);
 
     CATEGORIES.forEach((category, i) => {

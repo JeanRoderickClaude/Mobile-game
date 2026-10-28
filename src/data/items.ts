@@ -1,7 +1,8 @@
 import data from './items.json';
 
 // Shop items. Each one is an entry in items.json; cosmetics.ts turns its
-// "shape" and colours into a drawing. Default items (beanie, magenta vest,
+// "shape" (top-down, in the game) and "front" (front view, in dialogue and
+// the locker) recipes and colours into drawings. Default items (beanie, magenta vest,
 // no sign) are always owned and are not listed here.
 
 export type ItemCategory = 'hat' | 'outfit' | 'sign';
@@ -12,8 +13,10 @@ export interface ShopItem {
   category: ItemCategory;
   /** Cost in coins. */
   price: number;
-  /** Drawing recipe, one of SHAPES[category]. */
+  /** Top-down drawing recipe, one of SHAPES[category]. */
   shape: string;
+  /** Front-view drawing recipe, one of FRONT_SHAPES[category]. */
+  front: string;
   /** Main and secondary colour, as "#rrggbb". */
   color: string;
   accent: string;
@@ -21,8 +24,15 @@ export interface ShopItem {
 
 export const CATEGORIES: ItemCategory[] = ['hat', 'outfit', 'sign'];
 
-/** Shapes cosmetics.ts knows how to draw, per category. */
+/** Top-down shapes cosmetics.ts knows how to draw, per category. */
 export const SHAPES: Record<ItemCategory, string[]> = {
+  hat: ['bandana', 'beret', 'hardhat', 'crown'],
+  outfit: ['tracksuit', 'jersey', 'poncho', 'cape'],
+  sign: ['placard', 'lollipop', 'flag', 'banner'],
+};
+
+/** Front-view shapes cosmetics.ts knows how to draw, per category. */
+export const FRONT_SHAPES: Record<ItemCategory, string[]> = {
   hat: ['bandana', 'beret', 'hardhat', 'crown'],
   outfit: ['tracksuit', 'jersey', 'poncho', 'cape'],
   sign: ['placard', 'lollipop', 'flag', 'banner'],
@@ -38,6 +48,7 @@ function validate(item: ShopItem, i: number): ShopItem {
   if (!CATEGORIES.includes(item.category)) fail(`"category" must be one of ${CATEGORIES.join(', ')}`);
   if (!(Number.isInteger(item.price) && item.price > 0)) fail('"price" must be a positive whole number');
   if (!SHAPES[item.category].includes(item.shape)) fail(`"shape" must be one of ${SHAPES[item.category].join(', ')}`);
+  if (!FRONT_SHAPES[item.category].includes(item.front)) fail(`"front" must be one of ${FRONT_SHAPES[item.category].join(', ')}`);
   for (const key of ['color', 'accent'] as const) if (!/^#[0-9a-f]{6}$/i.test(item[key])) fail(`"${key}" must look like "#c0392b"`);
   return item;
 }

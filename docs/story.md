@@ -54,6 +54,8 @@ Quiet Squad humor. The officers are never cruel and never stupid. They are funny
 
 Light and serious. Most lines are light. Each scene gets one or two serious beats that show the real cost: a fine for a friend, a lost instrument, someone arrested. Play those beats straight, with no joke in the same line, and let the next line lift the mood again. Chapters 4 and 5 lean more serious than the rest, as the outline says.
 
+Staging. Put on stage only the characters who are physically present; voices from loudspeakers or radios speak from off stage, which dims everyone. Bring a character on with "enter" on the line where the story says they arrive, usually a narration line describing it, and take them off the same way. Keep Pip leftmost and at most four characters on stage at once. Use the street backdrop for outdoor scenes and the cellar for the Brass Cellar.
+
 Mechanics in dialogue. When a chapter teaches something, a character says it in the world's terms (stay in the crowd, stay out of their sight lines, pick up your tips), never in button names.
 
 Spelling. American English (harbor, neighbors, apologize).

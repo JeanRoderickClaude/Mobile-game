@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { BODIES, isKnownItem, type PlayerLook } from '../entities/cosmetics';
 import { LEVELS } from '../levels';
 import { getFlags, isChapterDone } from '../systems/save';
 import castJson from './cast.json';
@@ -8,15 +9,31 @@ import { checkFlagMap, matches, type Condition, type FlagValue } from './flags';
 // Chapters, cast and dialogue scenes. All of it is data, checked once at
 // startup; bad data throws an error naming the file and entry.
 
-export type PortraitShape = 'circle' | 'square' | 'diamond' | 'triangle' | 'hexagon';
-const SHAPES: PortraitShape[] = ['circle', 'square', 'diamond', 'triangle', 'hexagon'];
-
 export interface CastMember {
-  /** Shown next to the portrait, followed by a colon. */
+  /** Shown above the line, followed by a colon. */
   name: string;
+  /** Colour of the name. */
   color: string;
-  /** Placeholder portrait. */
-  shape: PortraitShape;
+  /** What they wear on stage, in front view. Left-out parts use CAST_LOOK_DEFAULTS. Pip ignores it and wears the player's equipped items. */
+  look?: Partial<PlayerLook>;
+}
+
+/** The cast id that always wears the player's equipped look and stands leftmost. */
+export const PLAYER_CAST_ID = 'pip';
+export const CAST_LOOK_DEFAULTS: PlayerLook = { body: 'light', outfit: 'tee-grey', hat: 'none', sign: 'none' };
+
+/** Background strips for the stage. */
+export const STAGES = ['street', 'cellar'] as const;
+export type StageName = (typeof STAGES)[number];
+
+/** A character in a scene and where they stand. */
+export interface StagePlace {
+  /** Cast id. */
+  id: string;
+  /** Centre x in the 540-wide design space. */
+  x: number;
+  /** Starts off stage; comes on with a line's "enter". */
+  offstage?: boolean;
 }
 
 export interface Choice {
@@ -33,10 +50,18 @@ export interface DialogueLine {
   if?: Condition;
   /** Optional, 2 to 4. The scene waits on this line until one is picked. */
   choices?: Choice[];
+  /** Cast ids that walk on before this line shows. Each must be in the scene's "cast". */
+  enter?: string[];
+  /** Cast ids that walk off before this line shows. */
+  exit?: string[];
 }
 
 export interface Dialogue {
   id: string;
+  /** Background strip behind the characters. */
+  stage: StageName;
+  /** Everyone who appears on stage during the scene, with their spots. */
+  cast: StagePlace[];
   lines: DialogueLine[];
 }
 
@@ -52,7 +77,7 @@ export interface Chapter {
   outro?: SceneRef;
 }
 
-export const CAST = castJson as Record<string, CastMember>;
+export const CAST = validateCast(castJson as Record<string, CastMember>);
 
 const dialogueModules = import.meta.glob<Omit<Dialogue, 'id'>>('./dialogue/*.json', { eager: true, import: 'default' });
 
@@ -69,8 +94,25 @@ function validateDialogue(d: Dialogue, path: string): Dialogue {
   const fail = (msg: string): never => {
     throw new Error(`Dialogue ${path}: ${msg}`);
   };
+  if (!STAGES.includes(d.stage)) fail(`"stage" must be one of ${STAGES.join(', ')}`);
+  if (!Array.isArray(d.cast)) fail('needs a "cast" array (it may be empty)');
+  const onStage = new Set<string>();
+  d.cast.forEach((p, i) => {
+    if (!Object.hasOwn(CAST, p.id)) fail(`cast ${i} "${p.id}" is not in src/story/cast.json`);
+    if (onStage.has(p.id)) fail(`cast "${p.id}" is listed twice`);
+    onStage.add(p.id);
+    if (!(typeof p.x === 'number' && p.x >= 40 && p.x <= 500)) fail(`cast "${p.id}" needs "x" between 40 and 500`);
+  });
+  const pip = d.cast.find((p) => p.id === PLAYER_CAST_ID);
+  if (pip && d.cast.some((p) => p.x < pip.x)) fail('Pip must stand leftmost');
   if (!Array.isArray(d.lines) || d.lines.length === 0) fail('needs a non-empty "lines" array');
   d.lines.forEach((line, i) => {
+    for (const key of ['enter', 'exit'] as const) {
+      const ids = line[key];
+      if (ids === undefined) continue;
+      if (!Array.isArray(ids)) fail(`line ${i} "${key}" must be a list of cast ids`);
+      for (const id of ids) if (!onStage.has(id)) fail(`line ${i} "${key}" names "${id}", who is not in the scene's "cast"`);
+    }
     if (line.speaker !== undefined && !Object.hasOwn(CAST, line.speaker)) fail(`line ${i} speaker "${line.speaker}" is not in src/story/cast.json`);
     if (typeof line.text !== 'string' || !line.text) fail(`line ${i} needs "text"`);
     if (line.if !== undefined) checkFlagMap(line.if, fail, `line ${i} "if"`);
@@ -89,11 +131,6 @@ function validateChapters(chapters: Chapter[]): Chapter[] {
   const fail = (msg: string): never => {
     throw new Error(`src/story/chapters.json: ${msg}`);
   };
-  for (const [key, c] of Object.entries(CAST)) {
-    if (!SHAPES.includes(c.shape)) throw new Error(`src/story/cast.json: "${key}" shape must be one of ${SHAPES.join(', ')}`);
-    if (!c.name) throw new Error(`src/story/cast.json: "${key}" needs a "name"`);
-    if (!/^#[0-9a-f]{6}$/i.test(c.color)) throw new Error(`src/story/cast.json: "${key}" color must be #rrggbb`);
-  }
   const ids = new Set<string>();
   chapters.forEach((c, i) => {
     if (!c.id || !c.title) fail(`chapter ${i} needs "id" and "title"`);
@@ -112,6 +149,29 @@ function validateChapters(chapters: Chapter[]): Chapter[] {
     }
   });
   return chapters;
+}
+
+function validateCast(cast: Record<string, CastMember>): Record<string, CastMember> {
+  const fail = (msg: string): never => {
+    throw new Error(`src/story/cast.json: ${msg}`);
+  };
+  if (!Object.hasOwn(cast, PLAYER_CAST_ID)) fail(`needs "${PLAYER_CAST_ID}"`);
+  for (const [key, c] of Object.entries(cast)) {
+    if (!c.name) fail(`"${key}" needs a "name"`);
+    if (!/^#[0-9a-f]{6}$/i.test(c.color)) fail(`"${key}" color must be #rrggbb`);
+    const look = c.look ?? {};
+    if (look.body !== undefined && !Object.hasOwn(BODIES, look.body)) fail(`"${key}" look body "${look.body}" is not in BODIES`);
+    for (const part of ['outfit', 'hat', 'sign'] as const) {
+      const id = look[part];
+      if (id !== undefined && !isKnownItem(part, id)) fail(`"${key}" look ${part} "${id}" is not a known ${part}`);
+    }
+  }
+  return cast;
+}
+
+/** What a cast member wears on stage; Pip's comes from the caller (the equipped look). */
+export function castLook(id: string): PlayerLook {
+  return { ...CAST_LOOK_DEFAULTS, ...CAST[id].look };
 }
 
 /** The dialogue a scene reference plays with the current flags, or undefined. */
