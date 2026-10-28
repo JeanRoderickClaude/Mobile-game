@@ -342,6 +342,28 @@ function drawStage(scene: Phaser.Scene, stage: StageName): Phaser.GameObjects.Co
     g.fillStyle(0x8d8f99, 1).fillRect(0, 392, w, STAGE_H - 392); // pavement
     g.fillStyle(0x767884, 1).fillRect(0, 392, w, 6);
     for (let x = 0; x < w; x += 90) g.fillRect(x, 398, 3, STAGE_H - 398);
+  } else if (stage === 'night') {
+    g.fillStyle(0x141b2e, 1).fillRect(0, 0, w, STAGE_H); // night sky
+    g.fillStyle(0xe8e4c8, 1).fillCircle(450, 90, 26); // moon
+    g.fillStyle(0x141b2e, 1).fillCircle(462, 82, 22);
+    g.fillStyle(0x222b40, 1);
+    for (const [x, top, bw] of [[0, 170, 120], [110, 130, 110], [210, 190, 130], [330, 150, 100], [420, 200, 120]]) g.fillRect(x, top, bw, 392 - top);
+    g.fillStyle(0xf2d27a, 0.6);
+    for (const [x, y] of [[40, 230], [150, 180], [170, 260], [260, 250], [360, 210], [470, 270]]) g.fillRect(x, y, 18, 24);
+    // Lamps with pools of light, a tram stop sign, and a dim billboard.
+    for (const lx of [90, 400]) {
+      g.fillStyle(0xffe8a0, 0.14).fillTriangle(lx, 250, lx - 70, 392, lx + 70, 392);
+      g.fillStyle(0x0d111c, 1).fillRect(lx - 3, 250, 6, 142);
+      g.fillStyle(0xfff1b8, 1).fillCircle(lx, 248, 7);
+    }
+    g.fillStyle(0x0d111c, 1).fillRect(258, 300, 5, 92).fillRoundedRect(240, 286, 42, 22, 4);
+    g.fillStyle(0x2b2f36, 1).fillRect(80, 122, 5, 26).fillRect(250, 122, 5, 26);
+    g.fillStyle(0x1a2230, 1).fillRect(40, 60, 250, 64);
+    backdrop.add(scene.add.text(165, 82, 'DRONE & PARTNERS', { fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '19px', color: '#9fb3c8' }).setOrigin(0.5));
+    backdrop.add(scene.add.text(165, 108, 'Focus pays.', { fontFamily: 'Arial, sans-serif', fontSize: '15px', color: '#6d8199' }).setOrigin(0.5));
+    backdrop.add(scene.add.text(261, 297, 'TRAM', { fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '11px', color: '#e8e4c8' }).setOrigin(0.5));
+    g.fillStyle(0x3a3f4a, 1).fillRect(0, 392, w, STAGE_H - 392); // pavement
+    g.fillStyle(0x2e323b, 1).fillRect(0, 392, w, 6);
   } else if (stage === 'harbor') {
     g.fillStyle(0x5d6f86, 1).fillRect(0, 0, w, STAGE_H); // evening fog
     g.fillStyle(0x76879c, 1).fillRect(0, 170, w, 120);

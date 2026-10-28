@@ -28,6 +28,15 @@ export interface DifficultyConfig {
   lingerMs: number;
   /** Trumpet: when the noise meter fills, officers within this distance come to look. */
   alertRadius: number;
+  /** Night: an officer spots a player outside every lit pool only within this fraction of the cone's range. */
+  darkRangeFactor: number;
+  /** Night: how dark the screen is outside the light (0 clear .. 1 black). */
+  darkness: number;
+  /** Night: radius of the light the player sees around Pip. */
+  pipLightRadius: number;
+  /** Night: sound carries further, so the hearing and alert radii are multiplied by these. */
+  nightHearingFactor: number;
+  nightAlertFactor: number;
 }
 
 // The "easy" key is kept so existing saves still load; players see it as Relaxed.
@@ -35,10 +44,12 @@ export const DIFFICULTIES = {
   easy: {
     label: 'Relaxed', catchTimeMs: 1500, visionRangeFactor: 0.8,
     hearingRadius: 230, noiseRisePerSec: 1 / 7, noiseFallPerSec: 1 / 4, lingerMs: 5500, alertRadius: 380,
+    darkRangeFactor: 0.45, darkness: 0.62, pipLightRadius: 150, nightHearingFactor: 1.3, nightAlertFactor: 1.2,
   },
   normal: {
     label: 'Normal', catchTimeMs: 500, visionRangeFactor: 1,
     hearingRadius: 190, noiseRisePerSec: 1 / 4.5, noiseFallPerSec: 1 / 7, lingerMs: 4000, alertRadius: 520,
+    darkRangeFactor: 0.5, darkness: 0.78, pipLightRadius: 120, nightHearingFactor: 1.3, nightAlertFactor: 1.3,
   },
 } satisfies Record<string, DifficultyConfig>;
 
@@ -101,6 +112,12 @@ export const NOIR_AURA_FACTOR = 0.75; // the colour glow around Pip reaches this
 export const NOIR_AURA_GROW_MS = 500; // glow grows to full size this fast when playing starts
 export const NOIR_AURA_FADE_MS = 1200; // and shrinks away this fast when it stops
 export const NOIR_SPREAD_MS = 1400; // a won zone fills with colour from Pip's spot over this time
+
+// Stand-still tasks: posters (chapter 3) and tagging.
+export const STAND_RADIUS = 30; // Pip's centre within this distance of a spot counts as at it
+export const STAND_STILL_SPEED = 12; // and moving no faster than this counts as standing still
+export const POSTER_MS = 2500; // standing still this long plants a poster
+export const POSTER_ZONE = 180; // a planted poster colours a square this size around it
 
 // Coins and the finish bonus.
 export const COIN_VALUE = 5; // value of a coin whose level entry has no "value"

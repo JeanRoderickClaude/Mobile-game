@@ -118,6 +118,21 @@ node tools/trumpet.mjs src/levels/level-02.json --route "360,900;360,650;270,450
 
 Want: alone rarely survives, gather usually survives, nonstop calls officers nearly every run, and the level's practice spot calls nobody.
 
+## posters.mjs: posters and tags at night
+
+For levels with poster spots. First prints each spot: lit or dark, and how much of 60 s some officer can see it (darkness included, so a dark spot is only "seen" when an officer is within the dark range). Then walks plans from the start, from 20 start times (`--starts`, `--every`): to each stop bottom to top, stands still there until the game counts it done, then goes to the finish. It steps sideways when stuck on a car. It never watches the beams.
+
+- `dark4`: the four darkest spots (unlit first, then least seen), or `--dark "i,j,k,l"`.
+- `all`: all six.
+- `dark4+tags`: the four darkest plus every tag spot (the van).
+
+```
+node tools/posters.mjs src/levels/level-03.json --difficulty easy
+node tools/posters.mjs src/levels/level-03.json --light
+```
+
+`--light` prints only the spot report. Each plan gives survivals, average time and coins of the survivors, and `caught at` positions.
+
 ## Balancing workflow
 
 Edit the level JSON, then run ride.mjs (crowds safe), blind.mjs (solo risky), stand.mjs (standing groups useful), solve.mjs (solo still possible) and coins.mjs (route coins safe, valuable coins risky). When a crowd ride fails, look at the officer with the longest sighting. Officers walking the same direction as a crowd, just behind it, are the usual cause; crosswise sweeps with narrow cones are kinder to crowds.

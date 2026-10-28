@@ -23,7 +23,7 @@ export const PLAYER_CAST_ID = 'pip';
 export const CAST_LOOK_DEFAULTS: PlayerLook = { body: 'light', outfit: 'tee-grey', hat: 'none', sign: 'none' };
 
 /** Background strips for the stage. */
-export const STAGES = ['street', 'harbor', 'cellar'] as const;
+export const STAGES = ['street', 'night', 'harbor', 'cellar'] as const;
 export type StageName = (typeof STAGES)[number];
 
 /** A character in a scene and where they stand. */

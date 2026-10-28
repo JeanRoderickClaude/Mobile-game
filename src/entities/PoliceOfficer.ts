@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { ALERT_LOOK_MS, ALERT_SPEED_FACTOR, CHARACTER_SCALE, COLORS, OFFICER_TURN_SPEED, VISION_RAYS } from '../config';
-import type { OfficerData, Rect } from '../levels/types';
+import type { LightData, OfficerData, Rect } from '../levels/types';
 import { angleDiff, castRay, hasLineOfSight } from '../systems/geometry';
 
 /**
@@ -9,7 +9,28 @@ import { angleDiff, castRay, hasLineOfSight } from '../systems/geometry';
  * look around for ALERT_LOOK_MS and walk back to where they left it.
  */
 export class PoliceOfficer {
+  /**
+   * Sight rule shared by every officer, set by GameScene for each level. At
+   * night (darkFactor below 1) a point outside every lit pool is only seen
+   * within darkFactor of the cone's range. Being static, it also applies to
+   * officers the balance tools create.
+   */
+  static sight: { night: boolean; lights: LightData[]; darkFactor: number } = { night: false, lights: [], darkFactor: 1 };
+
+  /** True when (x, y) stands in a lamp's pool of light. */
+  static lit(x: number, y: number): boolean {
+    return PoliceOfficer.sight.lights.some((l) => Math.hypot(x - l.x, y - l.y) <= l.radius);
+  }
+
+  /** How far an officer can spot someone standing at (x, y), as a fraction of the cone's range. */
+  static rangeFactorAt(x: number, y: number): number {
+    const s = PoliceOfficer.sight;
+    return !s.night || PoliceOfficer.lit(x, y) ? 1 : s.darkFactor;
+  }
+
   readonly data: OfficerData;
+  /** Outline of the last drawn cone (x, y pairs, starting at the officer), for the night overlay's flashlight holes. */
+  beam: number[] = [];
   x: number;
   y: number;
   facing: number;
@@ -149,7 +170,7 @@ export class PoliceOfficer {
     const dx = px - this.x;
     const dy = py - this.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > this.data.visionRange) return false;
+    if (dist > this.data.visionRange * PoliceOfficer.rangeFactorAt(px, py)) return false;
     if (Math.abs(angleDiff(Math.atan2(dy, dx), this.facing)) > this.halfAngle) return false;
     return hasLineOfSight(this.x, this.y, px, py, blockers);
   }
@@ -164,20 +185,39 @@ export class PoliceOfficer {
       100,
       Math.round(alert * 100),
     );
-    g.fillStyle(Phaser.Display.Color.GetColor(color.r, color.g, color.b), 0.28 + alert * 0.2);
-    g.beginPath();
-    g.moveTo(this.x, this.y);
+    const fill = Phaser.Display.Color.GetColor(color.r, color.g, color.b);
     const start = this.facing - this.halfAngle;
     const step = (this.halfAngle * 2) / VISION_RAYS;
+    const sight = PoliceOfficer.sight;
+    // Ray distances once; the night beam reuses them for its brighter inner part.
+    const rays: [number, number, number][] = [];
     for (let i = 0; i <= VISION_RAYS; i++) {
       const a = start + step * i;
       const dx = Math.cos(a);
       const dy = Math.sin(a);
-      const d = castRay(this.x, this.y, dx, dy, this.data.visionRange, blockers);
-      g.lineTo(this.x + dx * d, this.y + dy * d);
+      rays.push([dx, dy, castRay(this.x, this.y, dx, dy, this.data.visionRange, blockers)]);
     }
-    g.closePath();
-    g.fillPath();
+    this.beam = [this.x, this.y];
+    for (const [dx, dy, d] of rays) this.beam.push(this.x + dx * d, this.y + dy * d);
+    const polygon = (reach: number, alpha: number) => {
+      g.fillStyle(fill, alpha);
+      g.beginPath();
+      g.moveTo(this.x, this.y);
+      for (const [dx, dy, d] of rays) {
+        const r = Math.min(d, reach);
+        g.lineTo(this.x + dx * r, this.y + dy * r);
+      }
+      g.closePath();
+      g.fillPath();
+    };
+    if (!sight.night) {
+      polygon(Infinity, 0.28 + alert * 0.2);
+      return;
+    }
+    // A flashlight: the whole beam is where a lit player is spotted, the bright
+    // inner part where a player in the dark is spotted.
+    polygon(Infinity, 0.16 + alert * 0.15);
+    polygon(this.data.visionRange * sight.darkFactor, 0.3 + alert * 0.2);
   }
 
   private advanceTarget(): void {

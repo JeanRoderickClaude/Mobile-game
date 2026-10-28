@@ -51,7 +51,26 @@ function validate(level: LevelData, path: string): LevelData {
   });
   if (level.bystanders.length > 0 && !level.trumpet) fail('"bystanders" only come when Pip plays; set "trumpet": true');
   level.obstacles.forEach((o, i) => {
-    if (o.style !== undefined && !(o.style === 'water' && o.type === 'building')) fail(`obstacle ${i} "style" can only be "water", on a building`);
+    const ok = o.style === undefined || (o.style === 'water' && o.type === 'building') || (o.style === 'squad-van' && o.type === 'car');
+    if (!ok) fail(`obstacle ${i} "style" must be "water" on a building or "squad-van" on a car`);
+  });
+  const isPoint = (p: { x: unknown; y: unknown }) => typeof p.x === 'number' && typeof p.y === 'number';
+  if (level.night !== undefined) {
+    if (!level.night || !Array.isArray(level.night.lights)) fail('"night" needs a "lights" array (it may be empty)');
+    level.night.lights.forEach((l, i) => (!isPoint(l) || !(l.radius > 0)) && fail(`light ${i} needs "x", "y" and a positive "radius"`));
+  }
+  if (level.posters !== undefined) {
+    const p = level.posters;
+    if (!p || !Array.isArray(p.spots)) fail('"posters" needs a "spots" array');
+    p.spots.forEach((s, i) => (!isPoint(s) || (s.wall !== 'left' && s.wall !== 'right')) && fail(`poster spot ${i} needs "x", "y" and "wall" ("left" or "right")`));
+    if (!(Number.isInteger(p.required) && p.required >= 1 && p.required <= p.spots.length)) fail('"posters" "required" must be a whole number from 1 to the number of spots');
+    if (!(Number.isInteger(p.bonusCoins) && p.bonusCoins >= 0)) fail('"posters" "bonusCoins" must be a whole number, 0 or more');
+  }
+  level.tags ??= [];
+  if (!Array.isArray(level.tags)) fail('"tags" must be an array');
+  level.tags.forEach((t, i) => {
+    if (!isPoint(t) || !t.label || !t.flag) fail(`tag ${i} needs "x", "y", "label" and "flag"`);
+    if (!(Number.isInteger(t.coins) && t.coins >= 0) || !(t.ms > 0)) fail(`tag ${i} needs whole "coins" (0 or more) and positive "ms"`);
   });
   if (level.noir !== undefined) {
     if (!level.noir || !Array.isArray(level.noir.zones)) fail('"noir" needs a "zones" array (it may be empty)');

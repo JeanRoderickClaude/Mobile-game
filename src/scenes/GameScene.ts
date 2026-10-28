@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import {
   ASSIST_ANGLE_DEG, ASSIST_BREAK_STRENGTH, ASSIST_FLOOR_FACTOR, ASSIST_PACE_MAX, ASSIST_PACE_MIN, ASSIST_SETTLE_DIST, CHARACTER_SCALE, COIN_PICKUP_RADIUS, DIFFICULTIES, type Difficulty, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
-  PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, RING_INTERVAL_MS, RING_LIFE_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
+  POSTER_ZONE, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, RING_INTERVAL_MS, RING_LIFE_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
 } from '../config';
 import { Bystanders } from '../entities/Bystanders';
 import { Character } from '../entities/Character';
@@ -16,7 +16,9 @@ import { CHAPTERS, isPlayable, pickScene } from '../story/story';
 import { finishBonus } from '../systems/economy';
 import { hasLineOfSight, overlaps } from '../systems/geometry';
 import { Noir } from '../systems/noir';
-import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags } from '../systems/save';
+import { NightOverlay } from '../systems/night';
+import { StandSpots } from '../entities/StandSpots';
+import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags, setFlags } from '../systems/save';
 import { playCoin } from '../systems/sfx';
 import { VirtualJoystick } from '../systems/VirtualJoystick';
 import { CoinLabel } from '../ui/widgets';
@@ -58,6 +60,13 @@ export class GameScene extends Phaser.Scene {
   private trumpetButton: Phaser.GameObjects.Container | null = null;
   /** Set by the balance tools to play without a key or touch. */
   trumpetOverride = false;
+  /** Night darkness over the screen, in levels with "night". */
+  private nightOverlay: NightOverlay | null = null;
+  /** Poster and tag spots, the poster count in the HUD, and the closed finish. */
+  private spots!: StandSpots;
+  private posterText: Phaser.GameObjects.Text | null = null;
+  private gate: Phaser.GameObjects.Container | null = null;
+  private closedHint!: Phaser.GameObjects.Text;
   /** The gray look and its colour mask, in levels with "noir". */
   private noir: Noir | null = null;
   private colorBar: Phaser.GameObjects.Graphics | null = null;
@@ -105,6 +114,13 @@ export class GameScene extends Phaser.Scene {
     this.trumpetOverride = false;
     this.noir = null;
     this.colorBar = null;
+    this.nightOverlay = null;
+    this.posterText = null;
+    this.gate = null;
+    const cfg = DIFFICULTIES[this.difficulty];
+    PoliceOfficer.sight = this.level.night
+      ? { night: true, lights: this.level.night.lights, darkFactor: cfg.darkRangeFactor }
+      : { night: false, lights: [], darkFactor: 1 };
     this.suspicion = 0;
     this.elapsedMs = 0;
     this.finished = false;
@@ -119,6 +135,9 @@ export class GameScene extends Phaser.Scene {
 
     this.drawStreet();
     this.level.obstacles.forEach((o, i) => this.drawObstacle(o, i));
+    if (this.level.night) this.drawLamps();
+    this.spots = new StandSpots(this, this.level.posters?.spots ?? [], this.level.tags ?? []);
+    if (this.level.posters) this.gate = this.buildGate();
 
     const rangeFactor = DIFFICULTIES[this.difficulty].visionRangeFactor;
     this.officers = this.level.officers.map((d) => new PoliceOfficer(this, { ...d, visionRange: d.visionRange * rangeFactor }));
@@ -161,6 +180,22 @@ export class GameScene extends Phaser.Scene {
       .setDepth(90);
     this.coinLabel = new CoinLabel(this, 16, 64, 0).setScrollFactor(0).setDepth(90);
     if (this.level.trumpet) this.buildNoiseMeter();
+    if (this.level.posters) {
+      this.posterText = this.add
+        .text(16, 92, '', { fontFamily: 'Arial, sans-serif', fontSize: '20px', color: COLORS.text, stroke: '#000', strokeThickness: 4 })
+        .setScrollFactor(0)
+        .setDepth(90);
+      this.updatePosterText();
+    }
+    this.closedHint = this.add
+      .text(GAME_WIDTH / 2, 890, '', { fontFamily: 'Arial, sans-serif', fontSize: '20px', color: '#ffd23f', stroke: '#000', strokeThickness: 4 })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(90);
+    if (this.level.night) {
+      const cfg = DIFFICULTIES[this.difficulty];
+      this.nightOverlay = new NightOverlay(this, this.level.night.lights, cfg.darkness, cfg.pipLightRadius);
+    }
     this.assistHint = this.add
       .text(GAME_WIDTH / 2, 925, '', { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#7be08f', stroke: '#000', strokeThickness: 3 })
       .setOrigin(0.5)
@@ -171,7 +206,7 @@ export class GameScene extends Phaser.Scene {
     if (this.level.noir) {
       // Everything in the world goes into the filtered layer, except Pip, his
       // suspicion bar and hidden icon (always in colour) and the HUD (scroll factor 0).
-      const keep = new Set<Phaser.GameObjects.GameObject>([this.player, this.meter, this.hiddenIcon]);
+      const keep = new Set<Phaser.GameObjects.GameObject>([this.player, this.meter, this.hiddenIcon, ...this.spots.overlay]);
       const world = this.children.list.filter((o) => !keep.has(o) && (o as unknown as { scrollFactorX?: number }).scrollFactorX !== 0);
       this.noir = new Noir(this, this.level.noir.zones);
       this.noir.adopt(world);
@@ -191,13 +226,18 @@ export class GameScene extends Phaser.Scene {
     for (const o of this.officers) o.update(dt);
     for (const c of this.crowds) c.update(dt);
     const cfg = DIFFICULTIES[this.difficulty];
-    this.bystanders.update(dt, this.player.x, this.player.y, this.playing, cfg.hearingRadius, cfg.lingerMs);
-    this.noir?.update(dt, this.cameras.main.worldView, this.player.x, this.player.y, this.playing, cfg.hearingRadius, this.rings, RING_LIFE_MS);
+    this.bystanders.update(dt, this.player.x, this.player.y, this.playing, this.hearingRadius, cfg.lingerMs);
+    this.updateSpots(dt);
+    this.noir?.update(dt, this.cameras.main.worldView, this.player.x, this.player.y, this.playing, this.hearingRadius, this.rings, RING_LIFE_MS);
     this.updateDetection(dt);
+    this.nightOverlay?.update(this.cameras.main.worldView, this.player.x, this.player.y, this.officers);
 
     this.timerText.setText(formatTime(this.elapsedMs));
 
-    if (this.inRect(this.player.x, this.player.y, this.level.finish)) this.end('complete');
+    const atFinish = this.inRect(this.player.x, this.player.y, this.level.finish);
+    const open = this.finishOpen();
+    this.closedHint.setText(atFinish && !open ? `Put up ${this.level.posters!.required} posters first` : '');
+    if (atFinish && open) this.end('complete');
   }
 
   private movePlayer(dt: number): void {
@@ -344,6 +384,84 @@ export class GameScene extends Phaser.Scene {
     return this.add.container(0, 0, [g]).setDepth(41).setVisible(false);
   }
 
+  /** Hearing radius for the trumpet: larger at night, when sound carries further. */
+  private get hearingRadius(): number {
+    const cfg = DIFFICULTIES[this.difficulty];
+    return cfg.hearingRadius * (this.level.night ? cfg.nightHearingFactor : 1);
+  }
+
+  private get alertRadius(): number {
+    const cfg = DIFFICULTIES[this.difficulty];
+    return cfg.alertRadius * (this.level.night ? cfg.nightAlertFactor : 1);
+  }
+
+  /** The finish is closed until enough posters are up. */
+  private finishOpen(): boolean {
+    return !this.level.posters || this.spots.postersDone >= this.level.posters.required;
+  }
+
+  /** Posters and tags: progress at the spot Pip stands on, and what a finished one does. */
+  private updateSpots(dt: number): void {
+    const done = this.spots.update(dt, this.player.x, this.player.y, this.playerSpeed);
+    if (!done) return;
+    if (done.kind === 'poster') {
+      const posters = this.level.posters!;
+      if (this.spots.postersDone > posters.required) this.addRunCoins(posters.bonusCoins);
+      const half = POSTER_ZONE / 2;
+      this.noir?.colorArea({ x: done.markX - half, y: done.markY - half, width: POSTER_ZONE, height: POSTER_ZONE }, done.markX, done.markY);
+      this.updatePosterText();
+      if (this.finishOpen()) this.gate?.destroy();
+      if (this.finishOpen()) this.gate = null;
+    } else if (done.tag) {
+      this.addRunCoins(done.tag.coins);
+    }
+  }
+
+  private addRunCoins(amount: number): void {
+    if (amount <= 0) return;
+    this.runCoins += amount;
+    this.coinLabel.setValue(this.runCoins);
+    this.tweens.killTweensOf(this.coinLabel);
+    this.coinLabel.setScale(1);
+    this.tweens.add({ targets: this.coinLabel, scale: 1.25, duration: 90, yoyo: true });
+    playCoin(this, true);
+  }
+
+  private updatePosterText(): void {
+    const p = this.level.posters;
+    if (!p || !this.posterText) return;
+    const n = this.spots.postersDone;
+    this.posterText.setText(n < p.required ? `Posters ${n}/${p.required}` : `Posters ${n}/${this.spots.posterCount}`).setColor(n < p.required ? COLORS.text : '#7be08f');
+  }
+
+  /** Bars across the finish while it is closed. */
+  private buildGate(): Phaser.GameObjects.Container {
+    const f = this.level.finish;
+    const g = this.add.graphics();
+    g.fillStyle(0x1d1f2b, 0.75).fillRect(f.x, f.y, f.width, f.height);
+    g.fillStyle(0x9aa0aa, 1);
+    for (let x = f.x + 8; x < f.x + f.width; x += 22) g.fillRect(x, f.y, 6, f.height);
+    g.fillRect(f.x, f.y + f.height - 10, f.width, 6);
+    const label = this.add
+      .text(f.x + f.width / 2, f.y + f.height / 2 - 6, 'CLOSED', { fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '22px', color: '#ffd23f', stroke: '#000', strokeThickness: 4 })
+      .setOrigin(0.5);
+    return this.add.container(0, 0, [g, label]).setDepth(12);
+  }
+
+  /** Street lamps: a post and a warm pool of light. */
+  private drawLamps(): void {
+    const g = this.add.graphics().setDepth(3);
+    for (const l of this.level.night!.lights) {
+      g.fillStyle(0xffe8a0, 0.1).fillCircle(l.x, l.y, l.radius);
+      g.fillStyle(0xffe8a0, 0.1).fillCircle(l.x, l.y, l.radius * 0.6);
+    }
+    const posts = this.add.graphics().setDepth(12);
+    for (const l of this.level.night!.lights) {
+      posts.fillStyle(0x2b2d33, 1).fillCircle(l.x, l.y, 6);
+      posts.fillStyle(0xfff1b8, 1).fillCircle(l.x, l.y, 3.5);
+    }
+  }
+
   /** Reads the trumpet input, fills or drains the noise meter, calls officers when it fills, draws the rings. */
   private updateTrumpet(dt: number): void {
     if (!this.level.trumpet) return;
@@ -354,7 +472,7 @@ export class GameScene extends Phaser.Scene {
       // Too loud: officers close enough, with a clear walk, come to look where Pip is now.
       const { x, y } = this.player;
       for (const o of this.officers) {
-        if (Math.hypot(o.x - x, o.y - y) <= cfg.alertRadius && hasLineOfSight(o.x, o.y, x, y, this.walkBlockers)) o.investigate(x, y);
+        if (Math.hypot(o.x - x, o.y - y) <= this.alertRadius && hasLineOfSight(o.x, o.y, x, y, this.walkBlockers)) o.investigate(x, y);
       }
       this.noise = 0;
       this.cameras.main.flash(180, 255, 80, 80);
@@ -369,7 +487,7 @@ export class GameScene extends Phaser.Scene {
     this.rings = this.rings.filter((r) => (r.age += dt) < RING_LIFE_MS);
     for (const r of this.rings) {
       const t = r.age / RING_LIFE_MS;
-      this.ringGfx.lineStyle(3, 0xffd23f, 0.75 * (1 - t)).strokeCircle(r.x, r.y, 20 + (cfg.hearingRadius - 20) * t);
+      this.ringGfx.lineStyle(3, 0xffd23f, 0.75 * (1 - t)).strokeCircle(r.x, r.y, 20 + (this.hearingRadius - 20) * t);
     }
     this.drawNoiseMeter();
   }
@@ -457,7 +575,12 @@ export class GameScene extends Phaser.Scene {
     this.bonus = outcome === 'complete' ? finishBonus(this.elapsedMs, this.level) : 0;
     if (outcome === 'complete') addCoins(this.runCoins + this.bonus);
     const chapter = this.chapterIndex !== undefined ? CHAPTERS[this.chapterIndex] : undefined;
-    if (chapter && outcome === 'complete') completeChapter(chapter.id);
+    if (chapter && outcome === 'complete') {
+      completeChapter(chapter.id);
+      // Tag choices count only on finishing: each tag's flag is true when it was done this run, false when not.
+      const tags = this.level.tags ?? [];
+      if (tags.length) setFlags(Object.fromEntries(tags.map((t) => [t.flag, this.spots.tagged(t.flag)])));
+    }
     const data: ResultData = {
       outcome,
       elapsedMs: this.elapsedMs,
@@ -521,6 +644,18 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0xffffff, 0.18);
       g.fillRect(o.x + o.width * 0.25, o.y + o.height * 0.3, Math.min(24, o.width * 0.3), Math.min(18, o.height * 0.2));
       g.fillRect(o.x + o.width * 0.55, o.y + o.height * 0.65, Math.min(18, o.width * 0.25), Math.min(14, o.height * 0.15));
+    } else if (o.style === 'squad-van') {
+      // White van with a blue stripe, a roof light bar and a decibel meter dish.
+      g.fillStyle(0xeef1f5, 1).fillRoundedRect(o.x, o.y, o.width, o.height, 6);
+      const vertical = o.height >= o.width;
+      g.fillStyle(0x2f5fb3, 1);
+      if (vertical) g.fillRect(o.x + o.width / 2 - 4, o.y + 4, 8, o.height - 8);
+      else g.fillRect(o.x + 4, o.y + o.height / 2 - 4, o.width - 8, 8);
+      g.fillStyle(0x223344, 0.9);
+      if (vertical) g.fillRoundedRect(o.x + 5, o.y + 6, o.width - 10, 12, 3);
+      else g.fillRoundedRect(o.x + 6, o.y + 5, 12, o.height - 10, 3);
+      g.fillStyle(0x4a7bd0, 1).fillRect(o.x + o.width / 2 - 9, o.y + o.height / 2 - 3, 18, 6);
+      g.fillStyle(0x9aa0aa, 1).fillCircle(o.x + o.width * 0.72, o.y + o.height * 0.7, 6);
     } else {
       g.fillStyle(color, 1).fillRoundedRect(o.x, o.y, o.width, o.height, 8);
       // Windows: front and back windscreens along the long side.

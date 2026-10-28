@@ -1,0 +1,26 @@
+{
+  "stage": "cellar",
+  "tone": "color",
+  "cast": [
+    {"id": "pip", "x": 120},
+    {"id": "ruby", "x": 360}
+  ],
+  "lines": [
+    {"text": "Midnight in the Brass Cellar. Someone is tuning a cello very quietly, which in Port Murmur now counts as a protest."},
+    {"speaker": "ruby", "text": "There you are, kid. Fresh from the press, still warm."},
+    {"text": "She drops a stack of posters on the piano. CONCERT. SATURDAY. YOU KNOW WHERE. Below the words, a very large trumpet."},
+    {"speaker": "pip", "text": "(That trumpet looks a lot like mine. That trumpet looks a lot like evidence.)"},
+    {"speaker": "ruby", "text": "Six good walls between here and the tram stop. Four posters at least, or nobody hears about Saturday."},
+    {"speaker": "pip", "text": "Um. What happens if the Squad sees me gluing?"},
+    {"speaker": "ruby", "text": "They won't, if you keep to the dark. Their torches only reach so far, and a kid in a shadow is just a shadow."},
+    {"speaker": "ruby", "text": "The lamps are another story. Under a lamp, you're on a stage. Glue fast."},
+    {"speaker": "pip", "text": "(Stay in the dark. Stand still for ages. Also, somehow, be fast.)"},
+    {"speaker": "ruby", "text": "And sound carries at night. One note out there and half the street hears it, Squad included."},
+    {"speaker": "pip", "text": "So, no trumpet."},
+    {"speaker": "ruby", "text": "I didn't say that. I said everyone hears it."},
+    {"text": "Up the stairs, through the door with no handle, the streets wait: gray, still, and very well lit in all the wrong places."},
+    {"speaker": "ruby", "text": "One more thing. The Squad parks a van on Market Row every night, under the brightest lamp in town. Lovely clean paint."},
+    {"speaker": "pip", "text": "Are you... telling me to do something to it?"},
+    {"speaker": "ruby", "text": "I'm telling you it's there. What you do with the spare paint is your business."}
+  ]
+}

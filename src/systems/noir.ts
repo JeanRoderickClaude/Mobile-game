@@ -69,6 +69,11 @@ export class Noir {
     for (const o of objects) this.layer.add(o);
   }
 
+  /** Turns a rectangle coloured for the rest of the run, filling outward from (fromX, fromY). */
+  colorArea(rect: Rect, fromX: number, fromY: number): void {
+    this.zones.push({ ...rect, start: 'gray', colored: true, left: Infinity, spreadX: fromX, spreadY: fromY, spread: 0 });
+  }
+
   /** The zone Pip is in that music can still win, with how much is done (0..1), or null. */
   progressAt(x: number, y: number): number | null {
     const z = this.zones.find((zone) => !zone.colored && zone.left !== Infinity && inside(zone, x, y));

@@ -21,8 +21,8 @@ export interface Obstacle extends Rect, Conditional {
   type: 'building' | 'car';
   /** Optional hex colour such as "#c96f53". A palette colour is picked when left out. */
   color?: string;
-  /** Optional drawing style for buildings. "water" draws a harbor basin; it still blocks like a building, so keep it at the level edge. */
-  style?: 'water';
+  /** Optional drawing style. Buildings: "water" draws a harbor basin; it still blocks like a building, so keep it at the level edge. Cars: "squad-van" draws a Quiet Squad van. */
+  style?: 'water' | 'squad-van';
 }
 
 export interface OfficerData extends Conditional {
@@ -72,6 +72,29 @@ export interface BystanderData extends Point, Conditional {
   wander?: number;
   /** "local" (default) or "commuter": a gray-suited office worker who needs COMMUTER_HEAR_MS of music before coming over and walks at COMMUTER_FOLLOW_SPEED. */
   kind?: 'local' | 'commuter';
+}
+
+/** A street lamp's pool of light, at night. */
+export interface LightData extends Point {
+  radius: number;
+}
+
+/** A wall spot where a poster can be planted. */
+export interface PosterSpot extends Point {
+  /** Which way the wall faces, for drawing the mark: "left" walls are on the left side of the street. */
+  wall: 'left' | 'right';
+}
+
+/** A spot where standing still for ms does something once per run: pays coins and sets a story flag when the chapter is finished. */
+export interface TagSpot extends Point {
+  /** Shown above the spot while it is in reach, e.g. "Tag the van". */
+  label: string;
+  /** Story flag set to true on finishing when it was done this run, false when it was not. */
+  flag: string;
+  /** Coins added to the run when done. */
+  coins: number;
+  /** Standing still needed. */
+  ms: number;
 }
 
 /** A rectangle of the level for the noir look. Ground outside every zone is gray. */
@@ -126,6 +149,12 @@ export interface LevelData {
   finishLabel?: string;
   /** Optional. Draws controlled ground gray and high-contrast; see src/systems/noir.ts. Without it the level is all colour. */
   noir?: { zones: NoirZone[] };
+  /** Optional. Night: dark outside lit pools, so officers only spot an unlit player at the difficulty's darkRangeFactor of their range. */
+  night?: { lights: LightData[] };
+  /** Optional. Poster spots; the finish stays closed until `required` are planted, and each one past that pays `bonusCoins`. */
+  posters?: { spots: PosterSpot[]; required: number; bonusCoins: number };
+  /** Optional. Stand-still spots such as tagging a van. */
+  tags?: TagSpot[];
   /** Optional. Finish time in seconds that earns the full speed bonus. Default: height / PLAYER_SPEED x PAR_TIME_FACTOR. */
   parTimeSec?: number;
   /** Optional. Story-flag dependent tuning, applied by resolveLevel. */
