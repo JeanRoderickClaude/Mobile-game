@@ -63,5 +63,6 @@
     {"x": 110, "y": 1620, "value": 25},
     {"x": 105, "y": 770, "value": 25},
     {"x": 440, "y": 1240, "value": 25}
-  ]
+  ],
+  "noir": {"zones": [{"x": 0, "y": 1990, "width": 540, "height": 890, "start": "gray", "musicMs": 3000}, {"x": 0, "y": 1340, "width": 540, "height": 650, "start": "gray", "musicMs": 4000}, {"x": 0, "y": 430, "width": 540, "height": 910, "start": "gray", "musicMs": 6000}, {"x": 230, "y": 0, "width": 80, "height": 430, "start": "color"}]}
 }

@@ -70,6 +70,16 @@ export type CrowdData = MarchingCrowdData | StandingCrowdData;
 export interface BystanderData extends Point, Conditional {
   /** How far from the spot they stroll while idle. Default 25. */
   wander?: number;
+  /** "local" (default) or "commuter": a gray-suited office worker who needs COMMUTER_HEAR_MS of music before coming over and walks at COMMUTER_FOLLOW_SPEED. */
+  kind?: 'local' | 'commuter';
+}
+
+/** A rectangle of the level for the noir look. Ground outside every zone is gray. */
+export interface NoirZone extends Rect {
+  /** "gray" or "color" at the start of a run. */
+  start: 'gray' | 'color';
+  /** For gray zones: ms of trumpet music played inside it that turn it coloured for the rest of the run. Left out: it stays gray. */
+  musicMs?: number;
 }
 
 /** A coin lying on the street. Collected by walking over it. */
@@ -114,6 +124,8 @@ export interface LevelData {
   bystanders?: BystanderData[];
   /** Optional. Text drawn in the finish zone. Default "FINISH". */
   finishLabel?: string;
+  /** Optional. Draws controlled ground gray and high-contrast; see src/systems/noir.ts. Without it the level is all colour. */
+  noir?: { zones: NoirZone[] };
   /** Optional. Finish time in seconds that earns the full speed bonus. Default: height / PLAYER_SPEED x PAR_TIME_FACTOR. */
   parTimeSec?: number;
   /** Optional. Story-flag dependent tuning, applied by resolveLevel. */

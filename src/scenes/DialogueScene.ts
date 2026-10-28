@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { noirMatrix } from '../systems/noir';
 import { Character } from '../entities/Character';
 import { matches } from '../story/flags';
-import { CAST, DIALOGUES, PLAYER_CAST_ID, castLook, type DialogueLine, type StageName } from '../story/story';
+import { CAST, DIALOGUES, PLAYER_CAST_ID, castLook, type DialogueLine, type StageName, type Tone } from '../story/story';
 import { equippedLook, getFlags, setFlags } from '../systems/save';
 import { FONT, FONT_BOLD, makeButton, type Button } from '../ui/widgets';
 
@@ -73,6 +74,9 @@ export class DialogueScene extends Phaser.Scene {
   private hint!: Phaser.GameObjects.Text;
   private skip!: Button;
   private choiceButtons: Button[] = [];
+  /** Backdrop tone: the filter that grays it, and how gray it is now (0 colour .. 1 gray). */
+  private toneMatrix: Phaser.Display.ColorMatrix | null = null;
+  private grayness = { value: 0 };
 
   constructor() {
     super('dialogue');
@@ -96,7 +100,13 @@ export class DialogueScene extends Phaser.Scene {
     bg.setInteractive();
     bg.on('pointerdown', () => (this.pressed = true));
     bg.on('pointerup', () => this.pressed && this.advance());
-    drawStage(this.add.graphics(), dialogue.stage);
+    const backdrop = drawStage(this, dialogue.stage);
+    this.toneMatrix = null;
+    if (this.game.renderer.type === Phaser.WEBGL) {
+      backdrop.enableFilters();
+      this.toneMatrix = backdrop.filters!.internal.addColorMatrix().colorMatrix;
+    }
+    this.setTone(dialogue.tone ?? 'color', false);
 
     for (const place of dialogue.cast) {
       const look = place.id === PLAYER_CAST_ID ? equippedLook() : castLook(place.id);
@@ -205,6 +215,7 @@ export class DialogueScene extends Phaser.Scene {
     }
 
     this.moveActors(line, true);
+    if (line.tone) this.setTone(line.tone, true);
     this.spotlight(line.speaker);
 
     // Narration has no speaker: no name, italic text from the top of the box.
@@ -227,6 +238,22 @@ export class DialogueScene extends Phaser.Scene {
       b.label.setDepth(25).setFontSize(22);
       this.choiceButtons.push(b);
     });
+  }
+
+  /** Grays or colours the backdrop (characters keep their colours). Fades unless animate is false. */
+  private setTone(tone: Tone, animate: boolean): void {
+    const target = tone === 'gray' ? 1 : 0;
+    const apply = () => {
+      const t = this.grayness.value;
+      this.toneMatrix?.set(noirMatrix(t));
+    };
+    this.tweens.killTweensOf(this.grayness);
+    if (!animate) {
+      this.grayness.value = target;
+      apply();
+      return;
+    }
+    this.tweens.add({ targets: this.grayness, value: target, duration: 500, onUpdate: apply, onComplete: apply });
   }
 
   /** Applies a line's "exit" and "enter". Walks unless animate is false. */
@@ -286,8 +313,10 @@ function offstageX(x: number): number {
   return x < GAME_WIDTH / 2 ? -90 : GAME_WIDTH + 90;
 }
 
-/** Flat silhouette backdrops for the stage, filling y 0..STAGE_H. */
-function drawStage(g: Phaser.GameObjects.Graphics, stage: StageName): void {
+/** Flat silhouette backdrops for the stage, filling y 0..STAGE_H, in one container so they can be grayed. */
+function drawStage(scene: Phaser.Scene, stage: StageName): Phaser.GameObjects.Container {
+  const g = scene.add.graphics();
+  const backdrop = scene.add.container(0, 0, [g]);
   const w = GAME_WIDTH;
   if (stage === 'street') {
     g.fillStyle(0x8fb8d8, 1).fillRect(0, 0, w, STAGE_H); // morning sky
@@ -304,6 +333,12 @@ function drawStage(g: Phaser.GameObjects.Graphics, stage: StageName): void {
       g.fillStyle(0x4f5d73, 1);
     }
     g.fillStyle(0x2f3542, 1).fillRect(480, 260, 6, 150).fillRoundedRect(468, 252, 30, 12, 4); // lamppost
+    // A corporate billboard on the rooftops.
+    g.fillStyle(0x2b2f36, 1).fillRect(90, 118, 6, 40).fillRect(270, 118, 6, 40);
+    g.fillStyle(0x1f2a3a, 1).fillRect(40, 48, 290, 74);
+    g.lineStyle(3, 0xc9d3de, 1).strokeRect(40, 48, 290, 74);
+    backdrop.add(scene.add.text(185, 72, 'DRONE & PARTNERS', { fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '22px', color: '#e8eef5' }).setOrigin(0.5));
+    backdrop.add(scene.add.text(185, 102, 'Focus pays.', { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#9fb3c8' }).setOrigin(0.5));
     g.fillStyle(0x8d8f99, 1).fillRect(0, 392, w, STAGE_H - 392); // pavement
     g.fillStyle(0x767884, 1).fillRect(0, 392, w, 6);
     for (let x = 0; x < w; x += 90) g.fillRect(x, 398, 3, STAGE_H - 398);
@@ -345,4 +380,5 @@ function drawStage(g: Phaser.GameObjects.Graphics, stage: StageName): void {
     g.fillStyle(0x23140f, 1);
     for (let y = 400; y < STAGE_H; y += 22) g.fillRect(0, y, w, 3);
   }
+  return backdrop;
 }

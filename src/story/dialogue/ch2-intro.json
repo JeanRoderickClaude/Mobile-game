@@ -1,5 +1,6 @@
 {
   "stage": "harbor",
+  "tone": "gray",
   "cast": [
     {"id": "pip", "x": 100},
     {"id": "gus", "x": 250, "offstage": true},
@@ -19,6 +20,7 @@
     {"speaker": "pip", "text": "(Play a little. Walk while they're still humming along. Stop before the meters twitch. Simple. Terrifying, but simple.)"},
     {"text": "Down the quay, a grey uniform turns slowly, sweeping a decibel meter through the fog like a lighthouse.", "enter": ["mute"]},
     {"speaker": "mute", "text": "Sergeant, I'm reading a faint thirty decibels near the bollards. Possibly a gull. Possibly a suspect gull."},
+    {"speaker": "mute", "text": "Sorry, Sergeant. Drone and Partners called again, asking for hourly readings. I wasn't aware they were our superiors."},
     {"speaker": "gus", "text": "That's my cue to be a very boring fishmonger. Go on, Pip. Make some friends.", "exit": ["gus"]},
     {"speaker": "pip", "text": "(Make friends. In public. With a trumpet. Okay, feet. You did it once.)"}
   ]

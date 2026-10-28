@@ -4,7 +4,15 @@ The game is played as a story in eight chapters. Every session that touches chap
 
 ## Setting
 
-Port Murmur, a lively harbor city. Mayor Prudence Quill passes the Silence Act after noise complaints from the posh Velvet Heights district. A new Quiet Squad enforces it with decibel meters.
+Port Murmur, a lively harbor city. Mayor Prudence Quill passes the Silence Act, officially after noise complaints from the Velvet Heights district. A new Quiet Squad enforces it with decibel meters.
+
+Behind the law is Drone and Partners, a corporation owned by the mayor's brother-in-law, Victor Drone. It runs huge offices of dull, repetitive desk work under the slogan "Focus pays." Drone wants the city silent because music makes people happy and distracted, and a joyless workforce earns him money. He funded Quill's campaign, and his company fabricated the Velvet Heights complaints. The Silence Act stays a city law; Quill uses her power to enforce it on Drone's behalf. The Quiet Squad, the raids and the roadblocks are the mayor serving Drone.
+
+Velvet Heights is Drone's office district: gray towers, silent commuters in gray suits, nobody humming in the lifts.
+
+## Theme
+
+How corporate money and political power become entangled. Every act of enforcement in the story traces back to Drone's interests. The story never says this outright early on; it shows up in small hints (a billboard, an officer who is unsure who gives the orders) and is proven in chapter 7.
 
 ## Hero
 
@@ -12,7 +20,7 @@ Pip, a shy street trumpeter who just wants to keep playing. Over the story Pip s
 
 ## Tone
 
-Mostly light and satirical, with a few serious moments.
+Mostly light and satirical, with a few serious moments. Drone and Partners is the exception; see "Drone and Partners" in the style guide below.
 
 ## Chapters
 
@@ -22,7 +30,7 @@ Mostly light and satirical, with a few serious moments.
 4. The Raid. Police storm the Brass Cellar. New mechanic: police chase and search the last seen spot. Serious beat. Choice: help Ruby carry her instruments out (slower, riskier) or run. If Pip runs, Ruby does not appear later.
 5. Drummer Boy. Escort Teun, a loud drummer who hides poorly, to a secret rehearsal space. New mechanic: an ally who follows the player and needs cover. Teun is arrested at the end.
 6. Roadblocks. Barricades that move during the level. Before the level, the mayor's aide offers to release Teun in exchange for the organizers' names. Accepting brings Teun back but shrinks crowds in chapters 7 and 8. Refusing keeps Teun locked up until the finale.
-7. Velvet Heights. Near-empty wealthy streets, pure stealth. Pip finds proof that all the noise complaints came from one man: the mayor's brother-in-law, who sells noise-cancelling headphones.
+7. Velvet Heights. Drone's office district: gray towers, near-empty plazas and silent commuters, pure stealth. Pip finds proof of three things: the noise complaints were fabricated by Drone and Partners, Victor Drone funded the mayor's campaign, and internal company reports celebrate the Silence Act's effect on productivity.
 8. The Big Noise. A march to city hall for a giant street concert, using every mechanic. Earlier choices set crowd size, whether Ruby and Teun join, and police alertness. Three ending scenes depend on those choices.
 
 ## Design rules
@@ -39,7 +47,10 @@ Mostly light and satirical, with a few serious moments.
 - Ma Ruby: owner of the Brass Cellar, a hidden venue under the old fish auction (door with no handle; knock twice, hum a B-flat), open thirty years. Long red coat, rings shaped like brass horns. Appears as "Stranger" at the end of chapter 1 and introduces herself in chapter 2. Warm and blunt: "Down here, loud is polite." Planning a secret concert.
 - Old Jonas: an accordion player who sold his accordion because of the fines (mentioned by Ruby in chapter 2).
 - Mayor Prudence Quill: heard over loudspeakers so far. Announces the joys of silence at full volume.
-- Teun, the mayor's aide, the brother-in-law: not written yet.
+- Victor Drone: owner of Drone and Partners and Mayor Quill's brother-in-law. Funded her campaign. Not seen yet; when he appears he is calm, polite and precise, and speaks about people as output.
+- Drone and Partners: the corporation. Huge offices of repetitive desk work, slogan "Focus pays." Its name already shows on billboards in chapter 1 and in Officer Mute's nervous remark in chapter 2.
+- Commuters: Drone's office workers in gray suits, a bystander type for later chapters (Velvet Heights). They respond to the trumpet slowly: they need a moment of music before they stop and come over, and they walk slower than the harbor locals.
+- Teun and the mayor's aide: not written yet.
 
 ## Dialogue style guide
 
@@ -57,6 +68,18 @@ Light and serious. Most lines are light. Each scene gets one or two serious beat
 
 Staging. Put on stage only the characters who are physically present; voices from loudspeakers or radios speak from off stage, which dims everyone. Bring a character on with "enter" on the line where the story says they arrive, usually a narration line describing it, and take them off the same way. Keep Pip leftmost and at most four characters on stage at once. Backdrops: street for town scenes, harbor for the quay, cellar for the Brass Cellar.
 
+Drone and Partners. The surface of the game stays light and comic, but the corporation is cold and unsettling. Write it as calm, reasonable and efficient: memos, metrics, polite smiles, people described as productivity. Never make it cartoonishly evil (no cackling, no twirled moustaches, no stated wish to be evil), and never joke about it in its own scenes. Other characters may still be funny around it, as Officer Mute is when he wonders who his superiors are, but scenes inside Drone's world play straight. Hints come before proof: billboards and slips of the tongue in chapters 1 to 6, documents in chapter 7.
+
 Mechanics in dialogue. When a chapter teaches something, a character says it in the world's terms (stay in the crowd, stay out of their sight lines, pick up your tips), never in button names.
 
 Spelling. American English (harbor, neighbors, apologize).
+
+## Visual style
+
+Controlled places look controlled. Corporate and Quiet Squad ground is drawn in a gray, high-contrast noir style; music, and places won back by music, are vibrant color.
+
+In levels, gray ground is a grayscale copy of the level with extra contrast. While Pip plays the trumpet, color spreads outward from him with the sound rings and fades when he stops. Each level marks zones that start gray or colored; a gray zone that allows it turns colored for the rest of the run once enough music has been played inside it. Pip and everything he wears are always in full color, so the player can always find him. Colored zones mark places that belong to the music: Pip's busking corner, the Brass Cellar's door.
+
+In dialogue, the backdrop takes the scene's tone: gray for the Quiet Squad's streets and anything belonging to Drone and Partners, color for the Brass Cellar and other music places. Characters stay in color. A line can switch the tone, for example when the Squad arrives and the street goes gray, or when music returns. Use these switches for story beats, not decoration.
+
+Chapters 1 and 2 in practice: the busking corner where chapter 1 starts is colored, the rest of Main Street is gray; the harbor in chapter 2 starts gray and its three stretches can be won with music; the cellar door glows in color. The chapter 1 street backdrop shows a Drone and Partners billboard.

@@ -1,5 +1,6 @@
 {
   "stage": "street",
+  "tone": "gray",
   "cast": [
     {"id": "pip", "x": 120},
     {"id": "stranger", "x": 390, "offstage": true}
@@ -20,6 +21,6 @@
     {"speaker": "stranger", "text": "Unless you play where the meters can't reach. Under the old fish auction there's a door with no handle. Knock twice and hum a B-flat."},
     {"speaker": "pip", "text": "Hum? Isn't humming illegal now?"},
     {"speaker": "stranger", "text": "Only if they hear you. Ask for Ruby at the Brass Cellar."},
-    {"text": "When Pip looks up, the bollard is empty. Somewhere under the street, very faintly, a tuba plays one long note.", "exit": ["stranger"]}
+    {"text": "When Pip looks up, the bollard is empty. Somewhere under the street, very faintly, a tuba plays one long note.", "exit": ["stranger"], "tone": "color"}
   ]
 }

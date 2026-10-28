@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import {
   ASSIST_ANGLE_DEG, ASSIST_BREAK_STRENGTH, ASSIST_FLOOR_FACTOR, ASSIST_PACE_MAX, ASSIST_PACE_MIN, ASSIST_SETTLE_DIST, CHARACTER_SCALE, COIN_PICKUP_RADIUS, DIFFICULTIES, type Difficulty, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
-  PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, BYSTANDER_FOLLOW_SPEED, RING_INTERVAL_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
+  PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, RING_INTERVAL_MS, RING_LIFE_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
 } from '../config';
 import { Bystanders } from '../entities/Bystanders';
 import { Character } from '../entities/Character';
@@ -15,6 +15,7 @@ import type { Flags } from '../story/flags';
 import { CHAPTERS, isPlayable, pickScene } from '../story/story';
 import { finishBonus } from '../systems/economy';
 import { hasLineOfSight, overlaps } from '../systems/geometry';
+import { Noir } from '../systems/noir';
 import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags } from '../systems/save';
 import { playCoin } from '../systems/sfx';
 import { VirtualJoystick } from '../systems/VirtualJoystick';
@@ -57,6 +58,9 @@ export class GameScene extends Phaser.Scene {
   private trumpetButton: Phaser.GameObjects.Container | null = null;
   /** Set by the balance tools to play without a key or touch. */
   trumpetOverride = false;
+  /** The gray look and its colour mask, in levels with "noir". */
+  private noir: Noir | null = null;
+  private colorBar: Phaser.GameObjects.Graphics | null = null;
   /** Obstacles grown by an officer's half-size, for checking who can walk straight to a noise. */
   private walkBlockers: Rect[] = [];
   private difficulty: Difficulty = 'normal';
@@ -99,6 +103,8 @@ export class GameScene extends Phaser.Scene {
     this.trumpetPointer = null;
     this.trumpetButton = null;
     this.trumpetOverride = false;
+    this.noir = null;
+    this.colorBar = null;
     this.suspicion = 0;
     this.elapsedMs = 0;
     this.finished = false;
@@ -161,6 +167,16 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(90)
       .setAlpha(0.85);
+
+    if (this.level.noir) {
+      // Everything in the world goes into the filtered layer, except Pip, his
+      // suspicion bar and hidden icon (always in colour) and the HUD (scroll factor 0).
+      const keep = new Set<Phaser.GameObjects.GameObject>([this.player, this.meter, this.hiddenIcon]);
+      const world = this.children.list.filter((o) => !keep.has(o) && (o as unknown as { scrollFactorX?: number }).scrollFactorX !== 0);
+      this.noir = new Noir(this, this.level.noir.zones);
+      this.noir.adopt(world);
+      this.noir.layer.setDepth(29);
+    }
   }
 
   update(_time: number, delta: number): void {
@@ -176,6 +192,7 @@ export class GameScene extends Phaser.Scene {
     for (const c of this.crowds) c.update(dt);
     const cfg = DIFFICULTIES[this.difficulty];
     this.bystanders.update(dt, this.player.x, this.player.y, this.playing, cfg.hearingRadius, cfg.lingerMs);
+    this.noir?.update(dt, this.cameras.main.worldView, this.player.x, this.player.y, this.playing, cfg.hearingRadius, this.rings, RING_LIFE_MS);
     this.updateDetection(dt);
 
     this.timerText.setText(formatTime(this.elapsedMs));
@@ -266,7 +283,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (marching > 0) return marching;
     // Gathered bystanders follow Pip in any direction, at their walking pace.
-    if (this.bystanders.contains(this.player.x, this.player.y)) return BYSTANDER_FOLLOW_SPEED * 0.95;
+    if (this.bystanders.contains(this.player.x, this.player.y)) return this.bystanders.speed * 0.95;
     return standing ? HIDE_SPEED_FLOOR * ASSIST_FLOOR_FACTOR : Infinity;
   }
 
@@ -349,11 +366,10 @@ export class GameScene extends Phaser.Scene {
       this.rings.push({ x: this.player.x, y: this.player.y, age: 0 });
       this.ringClock = RING_INTERVAL_MS;
     }
-    const life = 900;
     this.ringGfx.clear();
-    this.rings = this.rings.filter((r) => (r.age += dt) < life);
+    this.rings = this.rings.filter((r) => (r.age += dt) < RING_LIFE_MS);
     for (const r of this.rings) {
-      const t = r.age / life;
+      const t = r.age / RING_LIFE_MS;
       this.ringGfx.lineStyle(3, 0xffd23f, 0.75 * (1 - t)).strokeCircle(r.x, r.y, 20 + (cfg.hearingRadius - 20) * t);
     }
     this.drawNoiseMeter();
@@ -366,9 +382,10 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(90);
     this.noiseBar = this.add.graphics().setScrollFactor(0).setDepth(90);
+    if (this.level.noir?.zones.some((z) => z.musicMs !== undefined)) this.colorBar = this.add.graphics().setScrollFactor(0).setDepth(90);
     if (!this.sys.game.device.input.touch) {
       this.add
-        .text(GAME_WIDTH / 2, 56, 'Hold Space to play', { fontFamily: 'Arial, sans-serif', fontSize: '15px', color: '#d0d2da', stroke: '#000', strokeThickness: 3 })
+        .text(GAME_WIDTH / 2, 70, 'Hold Space to play', { fontFamily: 'Arial, sans-serif', fontSize: '15px', color: '#d0d2da', stroke: '#000', strokeThickness: 3 })
         .setOrigin(0.5, 0)
         .setScrollFactor(0)
         .setDepth(90);
@@ -385,6 +402,19 @@ export class GameScene extends Phaser.Scene {
     const color = this.noise > 0.75 ? 0xff4a4a : this.noise > 0.5 ? 0xf2994a : 0xffd23f;
     g.fillStyle(color, 1).fillRect(x, 38, w * this.noise, 12);
     g.lineStyle(2, 0xffffff, 0.8).strokeRect(x - 3, 35, w + 6, 18);
+
+    // Under it, while Pip stands in a gray zone music can win: how close it is to turning colour.
+    const c = this.colorBar?.clear();
+    const progress = this.noir?.progressAt(this.player.x, this.player.y) ?? null;
+    if (c && progress !== null) {
+      c.fillStyle(0x000000, 0.6).fillRect(x - 3, 56, w + 6, 10);
+      const stripes = [0xff3fa4, 0xf2994a, 0xffd23f, 0x7be08f, 0x5ca9e6];
+      const filled = w * progress;
+      for (let i = 0; i < stripes.length; i++) {
+        const from = (w / stripes.length) * i;
+        if (from < filled) c.fillStyle(stripes[i], 1).fillRect(x + from, 58, Math.min(w / stripes.length, filled - from), 6);
+      }
+    }
   }
 
   /** Round trumpet button, bottom right, opposite the joystick. Held to play. */

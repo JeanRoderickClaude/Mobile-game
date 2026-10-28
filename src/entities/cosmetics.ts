@@ -274,6 +274,19 @@ const CAST_OUTFITS: Record<string, OutfitStyle> = {
       g.fillStyle(0xd4a017, 1).fillTriangle(-1.5, -42, 1.5, -42, 0, -33); // tie
     },
   },
+  // Commuters' office suit (also usable by cast members).
+  'gray-suit': {
+    draw: (g) => {
+      shirt(0x5d6168, 0x3a3d42).draw(g);
+      g.fillStyle(0xe8e8e8, 1).fillTriangle(-3, -7, 3, -7, 0, -1); // collar
+    },
+    front: (g) => {
+      shirtFront(g, 0x5d6168, 0x3a3d42);
+      g.fillStyle(0xe8e8e8, 1).fillTriangle(-5, -44, 5, -44, 0, -32);
+      g.fillStyle(0x2b2d33, 1).fillTriangle(-1.5, -42, 1.5, -42, 0, -32); // tie
+      g.fillStyle(0x3a3d42, 1).fillRoundedRect(10, -26, 8, 6, 1.5); // briefcase handle side
+    },
+  },
 };
 
 const CAST_HATS: Record<string, HatStyle> = {
@@ -291,6 +304,16 @@ const CAST_HATS: Record<string, HatStyle> = {
 };
 
 Object.assign(OUTFITS, CAST_OUTFITS);
+
+/** A commuter in a gray suit, with plain hair or a gray beanie. */
+export function commuterLook(): PlayerLook {
+  return {
+    body: Phaser.Utils.Array.GetRandom(Object.keys(BODIES)),
+    outfit: 'gray-suit',
+    hat: Phaser.Utils.Array.GetRandom(['hair-bob', 'hair-bun', 'none', 'beanie-grey']),
+    sign: 'none',
+  };
+}
 Object.assign(HATS, CAST_HATS);
 
 // --- Shop items --------------------------------------------------------------

@@ -82,8 +82,21 @@ export const GATHER_RING = 44; // gathered bystanders stand about this far from 
 export const GATHER_DISTANCE = 70; // a drawn bystander counts as gathered within this distance of Pip
 export const GATHER_MIN = 3; // gathered bystanders needed before they hide Pip
 export const RING_INTERVAL_MS = 380; // a new sound ring leaves Pip this often while playing
+export const RING_LIFE_MS = 900; // and grows to the hearing radius over this time
 export const ALERT_SPEED_FACTOR = 1.6; // officers walk to the noise at this multiple of their patrol speed
 export const ALERT_LOOK_MS = 3500; // and look around there this long before going back
+
+// Commuters: gray-suited office workers, a slower kind of bystander.
+export const COMMUTER_HEAR_MS = 1500; // music they must hear before they come over
+export const COMMUTER_FOLLOW_SPEED = 60; // and how fast they walk to Pip and keep up
+
+// Noir look for controlled ground (levels with "noir"). Gray areas get a
+// grayscale copy with extra contrast; colour spreads from Pip while he plays.
+export const NOIR_CONTRAST = 0.45; // added contrast in gray areas (0 = plain grayscale)
+export const NOIR_AURA_FACTOR = 0.75; // the colour glow around Pip reaches this fraction of the hearing radius
+export const NOIR_AURA_GROW_MS = 500; // glow grows to full size this fast when playing starts
+export const NOIR_AURA_FADE_MS = 1200; // and shrinks away this fast when it stops
+export const NOIR_SPREAD_MS = 1400; // a won zone fills with colour from Pip's spot over this time
 
 // Coins and the finish bonus.
 export const COIN_VALUE = 5; // value of a coin whose level entry has no "value"

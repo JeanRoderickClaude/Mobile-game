@@ -54,12 +54,19 @@ export interface DialogueLine {
   enter?: string[];
   /** Cast ids that walk off before this line shows. */
   exit?: string[];
+  /** Turns the backdrop gray or colour as this line shows (fades over half a second). */
+  tone?: Tone;
 }
+
+/** Backdrop look: "gray" for controlled, corporate places; "color" where music lives. */
+export type Tone = 'gray' | 'color';
 
 export interface Dialogue {
   id: string;
   /** Background strip behind the characters. */
   stage: StageName;
+  /** Backdrop look at the start of the scene. Default "color". */
+  tone?: Tone;
   /** Everyone who appears on stage during the scene, with their spots. */
   cast: StagePlace[];
   lines: DialogueLine[];
@@ -96,6 +103,9 @@ function validateDialogue(d: Dialogue, path: string): Dialogue {
   };
   if (!STAGES.includes(d.stage)) fail(`"stage" must be one of ${STAGES.join(', ')}`);
   if (!Array.isArray(d.cast)) fail('needs a "cast" array (it may be empty)');
+  const tones = ['gray', 'color'];
+  if (d.tone !== undefined && !tones.includes(d.tone)) fail('"tone" must be "gray" or "color"');
+  (d.lines ?? []).forEach((l, i) => l.tone !== undefined && !tones.includes(l.tone) && fail(`line ${i} "tone" must be "gray" or "color"`));
   const onStage = new Set<string>();
   d.cast.forEach((p, i) => {
     if (!Object.hasOwn(CAST, p.id)) fail(`cast ${i} "${p.id}" is not in src/story/cast.json`);

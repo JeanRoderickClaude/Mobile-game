@@ -1,5 +1,6 @@
 {
   "stage": "cellar",
+  "tone": "color",
   "cast": [
     {"id": "pip", "x": 120},
     {"id": "ruby", "x": 360, "offstage": true}

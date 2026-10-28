@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
 import {
-  BYSTANDER_FOLLOW_SPEED, BYSTANDER_RETURN_SPEED, BYSTANDER_WANDER_SPEED, CROWD_RADIUS, GATHER_DISTANCE, GATHER_MIN, GATHER_RING,
+  BYSTANDER_FOLLOW_SPEED, BYSTANDER_RETURN_SPEED, COMMUTER_FOLLOW_SPEED, COMMUTER_HEAR_MS, BYSTANDER_WANDER_SPEED, CROWD_RADIUS, GATHER_DISTANCE, GATHER_MIN, GATHER_RING,
   HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
 } from '../config';
 import type { BystanderData, Rect } from '../levels/types';
 import { overlaps } from '../systems/geometry';
 import { Character } from './Character';
-import { randomProtestorLook } from './cosmetics';
+import { commuterLook, randomProtestorLook } from './cosmetics';
 
 const BODY_HALF = 8; // collision half-size against obstacles
 const DEFAULT_WANDER = 25;
@@ -25,6 +25,11 @@ interface Person {
   angle: number;
   /** Time left with Pip after the music stops. */
   linger: number;
+  /** Walking pace toward Pip and alongside him. */
+  followSpeed: number;
+  /** Music a commuter must hear before coming over (0 for locals), and how much they have heard. */
+  hearMs: number;
+  heard: number;
   rand: () => number;
 }
 
@@ -43,7 +48,8 @@ function seeded(seed: number): () => number {
  * Idle locals who stroll near their spot. They block nothing and hide no one
  * on their own. While Pip plays, those within hearing walk over and stand in
  * a ring around him; at least GATHER_MIN gathered form a group that hides him
- * like a crowd moving at BYSTANDER_FOLLOW_SPEED. When the music stops they
+ * like a crowd moving at the pace of its slowest member. Commuters (gray
+ * suits) need COMMUTER_HEAR_MS of music before they come, and walk slower. When the music stops they
  * stay with him for the linger time, then drift home.
  */
 export class Bystanders {
@@ -52,14 +58,16 @@ export class Bystanders {
   x = 0;
   y = 0;
   private gathered = 0;
+  private pace = 0; // slowest walking pace among the gathered
   private ground: Phaser.GameObjects.Arc;
 
   constructor(scene: Phaser.Scene, data: BystanderData[], private blockers: Rect[]) {
     this.ground = scene.add.circle(0, 0, CROWD_RADIUS, 0xffffff, 0.07).setDepth(4).setVisible(false);
     data.forEach((d, i) => {
       const rand = seeded(i + 1);
+      const commuter = d.kind === 'commuter';
       this.people.push({
-        character: new Character(scene, d.x, d.y, randomProtestorLook(), { baked: true }).setDepth(25),
+        character: new Character(scene, d.x, d.y, commuter ? commuterLook() : randomProtestorLook(), { baked: true }).setDepth(25),
         homeX: d.x,
         homeY: d.y,
         wander: d.wander ?? DEFAULT_WANDER,
@@ -69,6 +77,9 @@ export class Bystanders {
         pause: rand() * 2000,
         angle: i * 2.39996,
         linger: 0,
+        followSpeed: commuter ? COMMUTER_FOLLOW_SPEED : BYSTANDER_FOLLOW_SPEED,
+        hearMs: commuter ? COMMUTER_HEAR_MS : 0,
+        heard: 0,
         rand,
       });
     });
@@ -84,9 +95,9 @@ export class Bystanders {
     return this.gathered >= GATHER_MIN;
   }
 
-  /** Walking pace of the gathered group (0 when there is no group). */
+  /** Walking pace of the gathered group: its slowest member (0 when there is no group). */
   get speed(): number {
-    return this.active ? BYSTANDER_FOLLOW_SPEED : 0;
+    return this.active ? this.pace : 0;
   }
 
   /** Same test as a crowd: inside the group and not outpacing it. */
@@ -103,9 +114,13 @@ export class Bystanders {
     let sx = 0;
     let sy = 0;
     this.gathered = 0;
+    this.pace = Infinity;
     for (const p of this.people) {
       const c = p.character;
-      if (playing && p.state !== 'drawn' && Math.hypot(c.x - pipX, c.y - pipY) <= hearing) p.state = 'drawn';
+      // Locals come at once; commuters only after hearing COMMUTER_HEAR_MS of music, which fades when it stops.
+      const hears = playing && Math.hypot(c.x - pipX, c.y - pipY) <= hearing;
+      p.heard = hears ? p.heard + deltaMs : Math.max(0, p.heard - deltaMs);
+      if (hears && p.state !== 'drawn' && p.heard >= p.hearMs) p.state = 'drawn';
       if (p.state === 'drawn') {
         if (playing) p.linger = lingerMs;
         else if ((p.linger -= deltaMs) <= 0) p.state = 'returning';
@@ -117,7 +132,7 @@ export class Bystanders {
       if (p.state === 'drawn') {
         gx = pipX + Math.cos(p.angle) * GATHER_RING;
         gy = pipY + Math.sin(p.angle) * GATHER_RING;
-        speed = BYSTANDER_FOLLOW_SPEED;
+        speed = p.followSpeed;
       } else if (p.state === 'returning') {
         gx = p.homeX;
         gy = p.homeY;
@@ -145,6 +160,7 @@ export class Bystanders {
 
       if (p.state === 'drawn' && Math.hypot(c.x - pipX, c.y - pipY) <= GATHER_DISTANCE) {
         this.gathered++;
+        this.pace = Math.min(this.pace, p.followSpeed);
         sx += c.x;
         sy += c.y;
       }

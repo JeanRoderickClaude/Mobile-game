@@ -47,11 +47,21 @@ function validate(level: LevelData, path: string): LevelData {
   level.bystanders.forEach((b, i) => {
     if (typeof b.x !== 'number' || typeof b.y !== 'number') fail(`bystander ${i} needs "x" and "y"`);
     if (b.wander !== undefined && !(b.wander >= 0)) fail(`bystander ${i} "wander" must be 0 or more`);
+    if (b.kind !== undefined && b.kind !== 'local' && b.kind !== 'commuter') fail(`bystander ${i} "kind" must be "local" or "commuter"`);
   });
   if (level.bystanders.length > 0 && !level.trumpet) fail('"bystanders" only come when Pip plays; set "trumpet": true');
   level.obstacles.forEach((o, i) => {
     if (o.style !== undefined && !(o.style === 'water' && o.type === 'building')) fail(`obstacle ${i} "style" can only be "water", on a building`);
   });
+  if (level.noir !== undefined) {
+    if (!level.noir || !Array.isArray(level.noir.zones)) fail('"noir" needs a "zones" array (it may be empty)');
+    level.noir.zones.forEach((z, i) => {
+      if (![z.x, z.y, z.width, z.height].every((v) => typeof v === 'number') || !(z.width > 0 && z.height > 0)) fail(`noir zone ${i} needs "x", "y" and positive "width" and "height"`);
+      if (z.start !== 'gray' && z.start !== 'color') fail(`noir zone ${i} "start" must be "gray" or "color"`);
+      if (z.musicMs !== undefined && !(z.musicMs > 0 && z.start === 'gray')) fail(`noir zone ${i} "musicMs" must be positive, on a gray zone`);
+      if (z.musicMs !== undefined && !level.trumpet) fail(`noir zone ${i} has "musicMs" but the level has no trumpet`);
+    });
+  }
   const lists = { obstacle: level.obstacles, officer: level.officers, crowd: level.crowds, coin: level.coins, bystander: level.bystanders };
   for (const [what, list] of Object.entries(lists)) {
     list.forEach((e, i) => e.if !== undefined && checkFlagMap(e.if, fail, `${what} ${i} "if"`));
