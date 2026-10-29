@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { COLORS, DIFFICULTIES, GAME_WIDTH, type Difficulty } from '../config';
 import { Character } from '../entities/Character';
 import { PRACTICE_LEVEL_INDEX } from '../levels';
-import { equippedLook, getCoins, getDifficulty, setDifficulty } from '../systems/save';
+import { equippedLook, getCoins, getDifficulty, getShowFps, setDifficulty, setShowFps } from '../systems/save';
 import { CoinLabel, FONT, FONT_BOLD, makeButton } from '../ui/widgets';
 
 /** First screen: title, coin balance, the current look, Play (the chapter map), Locker and the difficulty choice. */
@@ -31,6 +31,7 @@ export class MenuScene extends Phaser.Scene {
     makeButton(this, cx, 685, 'Play', play, 280, 70);
     makeButton(this, cx, 770, 'Locker', () => this.scene.start('locker'), 280, 70);
     this.buildDifficultyPicker(cx, 880);
+    this.buildFpsToggle(36);
     // A practice level for the chase and search system; hidden by the build setting VITE_PRACTICE_LEVEL=off.
     if (PRACTICE_LEVEL_INDEX >= 0) {
       makeButton(this, GAME_WIDTH - 72, 36, 'Practice', () => this.scene.start('game', { levelIndex: PRACTICE_LEVEL_INDEX }), 124, 44);
@@ -40,6 +41,23 @@ export class MenuScene extends Phaser.Scene {
     kb.once('keydown-ENTER', play);
     kb.once('keydown-SPACE', play);
     kb.once('keydown-L', () => this.scene.start('locker'));
+  }
+
+  /** A small "Show FPS" switch in the top left. The choice is saved at once and read by the game scene. */
+  private buildFpsToggle(y: number): void {
+    const x = 84;
+    const bg = this.add.rectangle(x, y, 140, 44, 0x34374a).setStrokeStyle(2, 0xffffff, 0.3).setInteractive({ useHandCursor: true });
+    const label = this.add.text(x, y, '', { fontFamily: FONT_BOLD, fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
+    const refresh = () => {
+      const on = getShowFps();
+      bg.setFillStyle(on ? 0xf2c94c : 0x34374a);
+      label.setText(`Show FPS: ${on ? 'On' : 'Off'}`).setColor(on ? '#1d1f2b' : '#ffffff');
+    };
+    bg.on('pointerup', () => {
+      setShowFps(!getShowFps());
+      refresh();
+    });
+    refresh();
   }
 
   /** Segmented Relaxed / Normal switch with a line explaining them. The choice is saved at once. */
