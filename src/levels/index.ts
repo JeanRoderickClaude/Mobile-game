@@ -81,6 +81,13 @@ function validate(level: LevelData, path: string): LevelData {
     if (!(Number.isInteger(t.coins) && t.coins >= 0) || !(t.ms > 0)) fail(`tag ${i} needs whole "coins" (0 or more) and positive "ms"`);
   });
   if (level.chaseMode !== undefined && typeof level.chaseMode !== 'boolean') fail('"chaseMode" must be true or false');
+  if (level.neon !== undefined) {
+    if (!Array.isArray(level.neon)) fail('"neon" must be an array');
+    level.neon.forEach((n, i) => {
+      if (![n.x, n.y, n.width, n.height].every((v) => typeof v === 'number') || !(n.width > 0 && n.height > 0)) fail(`neon ${i} needs "x", "y" and positive "width" and "height"`);
+      if (!/^#[0-9a-f]{6}$/i.test(n.color)) fail(`neon ${i} "color" must look like "#ff3fa4"`);
+    });
+  }
   if (level.noir !== undefined) {
     if (!level.noir || !Array.isArray(level.noir.zones)) fail('"noir" needs a "zones" array (it may be empty)');
     level.noir.zones.forEach((z, i) => {

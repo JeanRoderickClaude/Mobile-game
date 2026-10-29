@@ -16,6 +16,7 @@ import { CHAPTERS, isPlayable, pickScene } from '../story/story';
 import { finishBonus } from '../systems/economy';
 import { overlaps } from '../systems/geometry';
 import { Noir } from '../systems/noir';
+import { Atmosphere } from '../systems/atmosphere';
 import { NightOverlay } from '../systems/night';
 import { StandSpots } from '../entities/StandSpots';
 import { NavGrid } from '../systems/nav';
@@ -80,6 +81,7 @@ export class GameScene extends Phaser.Scene {
   private closedHint!: Phaser.GameObjects.Text;
   /** The gray look and its colour mask, in levels with "noir". */
   private noir: Noir | null = null;
+  private atmosphere: Atmosphere | null = null;
   private colorBar: Phaser.GameObjects.Graphics | null = null;
   private difficulty: Difficulty = 'normal';
   private catchTimeMs = 500;
@@ -129,6 +131,7 @@ export class GameScene extends Phaser.Scene {
     this.trumpetButton = null;
     this.trumpetOverride = false;
     this.noir = null;
+    this.atmosphere = null;
     this.colorBar = null;
     this.nightOverlay = null;
     this.posterText = null;
@@ -233,6 +236,7 @@ export class GameScene extends Phaser.Scene {
       this.noir = new Noir(this, this.level.noir.zones);
       this.noir.adopt(world);
       this.noir.layer.setDepth(29);
+      this.atmosphere = new Atmosphere(this, this.level, this.noir);
     }
   }
 
@@ -251,6 +255,7 @@ export class GameScene extends Phaser.Scene {
     this.bystanders.update(dt, this.player.x, this.player.y, this.playing, this.hearingRadius, cfg.lingerMs);
     this.updateSpots(dt);
     this.noir?.update(dt, this.cameras.main.worldView, this.player.x, this.player.y, this.playing, this.hearingRadius, this.rings, RING_LIFE_MS);
+    this.atmosphere?.update(dt);
     this.updateDetection(dt);
     this.nightOverlay?.update(this.cameras.main.worldView, this.player.x, this.player.y, this.officers);
 

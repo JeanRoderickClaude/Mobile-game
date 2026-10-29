@@ -1,9 +1,9 @@
 {
-  "pip": { "name": "Pip", "color": "#ff7cc4" },
-  "gus": { "name": "Gus", "color": "#7cc0f0", "look": { "body": "medium", "outfit": "gus-apron", "hat": "beanie-grey" } },
-  "hush": { "name": "Sgt. Hush", "color": "#a9b8d6", "look": { "body": "light", "outfit": "squad-uniform", "hat": "squad-cap" } },
-  "mute": { "name": "Officer Mute", "color": "#a9b8d6", "look": { "body": "dark", "outfit": "squad-uniform", "hat": "squad-cap" } },
-  "quill": { "name": "Mayor Quill", "color": "#c3a6ec", "look": { "body": "light", "outfit": "quill-suit", "hat": "hair-bob" } },
-  "stranger": { "name": "Stranger", "color": "#ff8a7a", "look": { "body": "dark", "outfit": "ruby-coat", "hat": "hair-bun" } },
-  "ruby": { "name": "Ma Ruby", "color": "#ff8a7a", "look": { "body": "dark", "outfit": "ruby-coat", "hat": "hair-bun" } }
+  "pip": {"name": "Pip", "color": "#ff7cc4"},
+  "gus": {"name": "Gus", "color": "#7cc0f0", "look": {"body": "medium", "outfit": "gus-apron", "hat": "beanie-grey", "hair": "buzz", "hairColor": "gold"}},
+  "hush": {"name": "Sgt. Hush", "color": "#a9b8d6", "look": {"body": "light", "outfit": "squad-uniform", "hat": "squad-cap", "hair": "buzz", "hairColor": "black"}},
+  "mute": {"name": "Officer Mute", "color": "#a9b8d6", "look": {"body": "dark", "outfit": "squad-uniform", "hat": "squad-cap", "hair": "buzz", "hairColor": "black"}},
+  "quill": {"name": "Mayor Quill", "color": "#c3a6ec", "look": {"body": "light", "outfit": "quill-suit", "hat": "none", "hair": "bob", "hairColor": "gold"}},
+  "stranger": {"name": "Stranger", "color": "#ff8a7a", "look": {"body": "dark", "outfit": "ruby-coat", "hat": "none", "hair": "bun", "hairColor": "darkbrown"}},
+  "ruby": {"name": "Ma Ruby", "color": "#ff8a7a", "look": {"body": "dark", "outfit": "ruby-coat", "hat": "none", "hair": "bun", "hairColor": "darkbrown"}}
 }

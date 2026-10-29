@@ -62,5 +62,11 @@
     { "x": 300, "y": 2220 }, { "x": 290, "y": 240 },
     { "x": 60, "y": 1350, "value": 25 }, { "x": 480, "y": 1350, "value": 25 }, { "x": 60, "y": 1920, "value": 25 }
   ],
+  "neon": [
+    { "x": 112, "y": 275, "width": 6, "height": 48, "color": "#ff3fa4" },
+    { "x": 112, "y": 1575, "width": 6, "height": 64, "color": "#29e0ff" },
+    { "x": 422, "y": 240, "width": 6, "height": 64, "color": "#ffb03a" },
+    { "x": 422, "y": 1610, "width": 6, "height": 48, "color": "#9a6bff" }
+  ],
   "noir": { "zones": [{ "x": 0, "y": 2680, "width": 540, "height": 200, "start": "color" }] }
 }

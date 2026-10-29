@@ -4,6 +4,7 @@ import {
   VISION_RAYS,
 } from '../config';
 import type { LightData, OfficerData, Point, Rect } from '../levels/types';
+import { inkify } from './ink';
 import { angleDiff, castRay, hasLineOfSight } from '../systems/geometry';
 import type { NavGrid } from '../systems/nav';
 
@@ -453,21 +454,19 @@ export class PoliceOfficer {
   }
 
   private buildSprite(scene: Phaser.Scene): Phaser.GameObjects.Container {
-    const g = scene.add.graphics();
-    // Drawn facing up, like the player.
+    const g = inkify(scene.add.graphics(), 1.25);
+    // Drawn facing up, like the player: inked, with a big cap over a big head.
     g.fillStyle(0xf3cfa4, 1);
-    g.fillCircle(-15, 2, 4.5);
-    g.fillCircle(15, 2, 4.5);
+    g.fillCircle(-15, 2, 5);
+    g.fillCircle(15, 2, 5);
     g.fillStyle(COLORS.officer, 1);
     g.fillEllipse(0, 2, 32, 19);
-    g.lineStyle(2, 0x0f1a33, 1);
-    g.strokeEllipse(0, 2, 32, 19);
     g.fillStyle(0xf2c94c, 1);
     g.fillRect(-11, -1, 4, 3); // badge
     g.fillStyle(COLORS.officerCap, 1);
-    g.fillCircle(0, 0, 9);
+    g.fillCircle(0, 0, 11);
     g.fillStyle(0x0b1326, 1);
-    g.fillEllipse(0, -8, 13, 6); // cap peak
+    g.fillEllipse(0, -9.5, 15, 7); // cap peak
     g.fillStyle(0xffffff, 1);
     g.fillRect(-2, -3, 4, 3);
     return scene.add.container(this.x, this.y, [g]).setScale(CHARACTER_SCALE);

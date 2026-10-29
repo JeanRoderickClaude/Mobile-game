@@ -74,6 +74,15 @@ export interface BystanderData extends Point, Conditional {
   kind?: 'local' | 'commuter';
 }
 
+/** A neon tube on a wall, drawn above the gray so it keeps its colour. x, y, width and height are the tube's box. */
+export interface NeonData {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+}
+
 /** A street lamp's pool of light, at night. */
 export interface LightData extends Point {
   radius: number;
@@ -151,6 +160,8 @@ export interface LevelData {
   noir?: { zones: NoirZone[] };
   /** Optional. Night: dark outside lit pools, so officers only spot an unlit player at the difficulty's darkRangeFactor of their range. */
   night?: { lights: LightData[] };
+  /** Optional (noir levels): neon tubes on the walls. */
+  neon?: NeonData[];
   /** Optional. Chase rule: when the seen meter fills, the officer chases Pip instead of catching him on the spot; only a chasing officer touching Pip catches him. Default false. */
   chaseMode?: boolean;
   /** Optional. Poster spots; the finish stays closed until `required` are planted, and each one past that pays `bonusCoins`. */

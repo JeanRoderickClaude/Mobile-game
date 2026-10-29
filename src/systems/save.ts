@@ -159,5 +159,5 @@ export function setFlags(values: Record<string, FlagValue>): void {
 
 /** The look the player wears in a run. */
 export function equippedLook(): PlayerLook {
-  return { ...DEFAULT_LOOK, ...state.equipped };
+  return { ...DEFAULT_LOOK, hat: state.equipped.hat, outfit: state.equipped.outfit, sign: state.equipped.sign, hairColor: state.equipped.haircolor };
 }

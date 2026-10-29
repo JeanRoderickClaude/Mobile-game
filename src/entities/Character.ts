@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CHARACTER_SCALE } from '../config';
-import { BODIES, DEFAULT_LOOK, FRONT, HATS, OUTFITS, SIGNS, type PlayerLook } from './cosmetics';
+import { BODIES, DEFAULT_LOOK, FRONT, HAIR_COLORS, HAIRSTYLES, HATS, OUTFITS, SIGNS, type PlayerLook } from './cosmetics';
+import { INK, inkify } from './ink';
 
 /**
  * A protestor: the player or a crowd member. Drawn from stacked layers so each
@@ -9,7 +10,10 @@ import { BODIES, DEFAULT_LOOK, FRONT, HATS, OUTFITS, SIGNS, type PlayerLook } fr
  *   outfit - shirt, hoodie, coat
  *   sign  - a carried sign or flag, held out ahead of the player
  *   head  - drawn from the body's skin tone, above the outfit
+ *   hair  - between the head and the hat, so a hat hides the hair under it
  *   hat   - topmost layer
+ * Every layer is inked (see ink.ts): thick dark outlines and one shade tone. The head and everything on it
+ * (hair, hat) is drawn HEAD_SCALE times larger than the art is authored, for a big-headed comic look.
  * The player also gets a marker ring underneath so they stand out in a crowd.
  * Crowd members are "baked": the layers are rendered once into a texture shared
  * by every character with the same look, and shown as one image. That keeps
@@ -30,6 +34,12 @@ export interface CharacterOptions {
   view?: 'top' | 'front';
 }
 
+const OUTLINE_TOP = 1.25; // outline thickness in authored units, top-down
+const OUTLINE_FRONT = 1.5; // front view is drawn about 2.7 times larger on the stage
+const HEAD_SCALE_TOP = 1.25; // the head, hair and hat grow about the middle of the head
+const HEAD_SCALE_FRONT = 1.3; // ...about the neck, so the chin stays put and the head grows up and out
+const NECK_Y = -46;
+
 const BAKE_RES = 2; // baked textures are drawn at this multiple for sharpness
 const BAKE_SIZE = 64 * BAKE_RES; // covers local space -32..32, enough for a sign
 
@@ -38,6 +48,8 @@ export class Character extends Phaser.GameObjects.Container {
   private outfitLayer: Phaser.GameObjects.Graphics;
   private signLayer: Phaser.GameObjects.Graphics;
   private headLayer: Phaser.GameObjects.Graphics;
+  private hairBackLayer: Phaser.GameObjects.Graphics;
+  private hairLayer: Phaser.GameObjects.Graphics;
   private hatLayer: Phaser.GameObjects.Graphics;
   private look: PlayerLook;
   private front: boolean;
@@ -54,24 +66,33 @@ export class Character extends Phaser.GameObjects.Container {
       ring.lineStyle(2.5, 0xffffff, 0.9).strokeCircle(0, 2, 21);
       this.add(ring);
     }
-    this.bodyLayer = scene.make.graphics({}, false);
-    this.outfitLayer = scene.make.graphics({}, false);
-    this.signLayer = scene.make.graphics({}, false);
-    this.headLayer = scene.make.graphics({}, false);
-    this.hatLayer = scene.make.graphics({}, false);
+    const width = this.front ? OUTLINE_FRONT : OUTLINE_TOP;
+    const layer = () => inkify(scene.make.graphics({}, false), width);
+    this.bodyLayer = layer();
+    this.outfitLayer = layer();
+    this.signLayer = layer();
+    this.headLayer = layer();
+    this.hairBackLayer = layer();
+    this.hairLayer = layer();
+    this.hatLayer = layer();
+    // The head, its hair and the hat share one transform.
+    const s = this.front ? HEAD_SCALE_FRONT : HEAD_SCALE_TOP;
+    const pivotY = this.front ? NECK_Y : 0;
+    for (const g of [this.headLayer, this.hairBackLayer, this.hairLayer, this.hatLayer]) g.setScale(s).setPosition(0, pivotY * (1 - s));
     this.redrawBody();
     this.redrawOutfit();
     this.redrawSign();
+    this.redrawHair();
     this.redrawHat();
     if (this.front) {
-      this.add([this.signLayer, this.bodyLayer, this.outfitLayer, this.headLayer, this.hatLayer]);
+      this.add([this.signLayer, this.bodyLayer, this.outfitLayer, this.hairBackLayer, this.headLayer, this.hairLayer, this.hatLayer]);
     } else if (options.baked) {
       // Created after the layers are drawn, so the first bake sees every layer.
       this.image = new Phaser.GameObjects.Image(scene, 0, 0, '__DEFAULT').setScale(1 / BAKE_RES);
       this.add(this.image);
       this.bake();
     } else {
-      this.add([this.bodyLayer, this.outfitLayer, this.signLayer, this.headLayer, this.hatLayer]);
+      this.add([this.bodyLayer, this.outfitLayer, this.signLayer, this.headLayer, this.hairLayer, this.hatLayer]);
     }
     this.setScale(CHARACTER_SCALE);
     scene.add.existing(this);
@@ -105,9 +126,21 @@ export class Character extends Phaser.GameObjects.Container {
     return this;
   }
 
+  setHair(id: PlayerLook['hair']): this {
+    this.look.hair = id;
+    this.redrawHair();
+    return this;
+  }
+
+  setHairColor(id: PlayerLook['hairColor']): this {
+    this.look.hairColor = id;
+    this.redrawHair();
+    return this;
+  }
+
   /** Swap every layer to match a look. */
   setLook(look: PlayerLook): this {
-    return this.setBodyStyle(look.body).setOutfit(look.outfit).setSign(look.sign).setHat(look.hat);
+    return this.setBodyStyle(look.body).setOutfit(look.outfit).setSign(look.sign).setHat(look.hat).setHair(look.hair).setHairColor(look.hairColor);
   }
 
   /** Turn to face a movement direction (unless turn is false) and swing the hands while walking. */
@@ -130,15 +163,16 @@ export class Character extends Phaser.GameObjects.Container {
     const h = this.headLayer.clear();
     if (this.front) {
       const { headY: y, headR: r } = FRONT;
-      h.fillStyle(skin, 1).fillRect(-3, y + r - 2, 6, 5); // neck
-      h.fillCircle(0, y, r).lineStyle(1.5, 0x000000, 0.35).strokeCircle(0, y, r);
-      h.fillStyle(0x1d1f2b, 1).fillCircle(-3.2, y + 0.5, 1.3).fillCircle(3.2, y + 0.5, 1.3);
-      h.lineStyle(1.2, 0x1d1f2b, 0.8).beginPath().arc(0, y + 3, 2.8, 0.3, Math.PI - 0.3, false).strokePath();
+      h.fillStyle(skin, 1).fillRect(-3.5, y + r - 3, 7, 7); // neck
+      h.fillStyle(skin, 1).fillCircle(0, y, r);
+      // A cheerful face: wide eyes with a glint, rosy cheeks and a big smile.
+      h.fillStyle(0x1d1f2b, 1).fillEllipse(-3.4, y + 0.2, 2.8, 3.6).fillEllipse(3.4, y + 0.2, 2.8, 3.6);
+      h.fillStyle(0xffffff, 1).fillCircle(-3.9, y - 0.6, 0.8).fillCircle(2.9, y - 0.6, 0.8);
+      h.fillStyle(0xff6f8f, 0.55).fillCircle(-6.2, y + 3.4, 1.9).fillCircle(6.2, y + 3.4, 1.9);
+      h.lineStyle(1.3, INK, 1).beginPath().arc(0, y + 2.6, 3.4, 0.25, Math.PI - 0.25, false).strokePath();
     } else {
       h.fillStyle(skin, 1);
       h.fillCircle(0, 0, 8);
-      h.lineStyle(1.5, 0x000000, 0.35);
-      h.strokeCircle(0, 0, 8);
     }
     this.bake();
   }
@@ -156,8 +190,8 @@ export class Character extends Phaser.GameObjects.Container {
     }
     g.clear();
     g.fillStyle(skin, 1);
-    g.fillCircle(-15, 2 - swing, 4.5);
-    g.fillCircle(15, 2 + swing, 4.5);
+    g.fillCircle(-15, 2 - swing, 5);
+    g.fillCircle(15, 2 + swing, 5);
   }
 
   private redrawOutfit(): void {
@@ -174,6 +208,20 @@ export class Character extends Phaser.GameObjects.Container {
     this.bake();
   }
 
+  private redrawHair(): void {
+    const style = HAIRSTYLES[this.look.hair];
+    const color = HAIR_COLORS[this.look.hairColor];
+    this.hairLayer.clear();
+    this.hairBackLayer.clear();
+    if (this.front) {
+      style.back(this.hairBackLayer, color);
+      style.front(this.hairLayer, color);
+    } else {
+      style.draw(this.hairLayer, color);
+    }
+    this.bake();
+  }
+
   private redrawHat(): void {
     this.hatLayer.clear();
     const style = HATS[this.look.hat];
@@ -184,15 +232,16 @@ export class Character extends Phaser.GameObjects.Container {
   /** For baked characters: point the image at the texture for the current look, rendering it once if new. */
   private bake(): void {
     if (!this.image) return;
-    const { body, outfit, sign, hat } = this.look;
-    const key = `character:${String(body)}:${String(outfit)}:${String(sign)}:${String(hat)}`;
+    const { body, outfit, sign, hat, hair, hairColor } = this.look;
+    const key = `character:${String(body)}:${String(outfit)}:${String(sign)}:${String(hat)}:${String(hair)}:${String(hairColor)}`;
     const textures = this.scene.textures;
     if (!textures.exists(key)) {
       const dt = textures.addDynamicTexture(key, BAKE_SIZE, BAKE_SIZE)!;
-      const layers = [this.bodyLayer, this.outfitLayer, this.signLayer, this.headLayer, this.hatLayer];
-      for (const g of layers) g.setScale(BAKE_RES);
+      const layers = [this.bodyLayer, this.outfitLayer, this.signLayer, this.headLayer, this.hairLayer, this.hatLayer];
+      const base = new Map(layers.map((g) => [g, g.scaleX] as const));
+      for (const g of layers) g.setScale(base.get(g)! * BAKE_RES);
       dt.draw(layers, BAKE_SIZE / 2, BAKE_SIZE / 2).render();
-      for (const g of layers) g.setScale(1);
+      for (const g of layers) g.setScale(base.get(g)!);
     }
     this.image.setTexture(key);
   }
