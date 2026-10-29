@@ -2,10 +2,10 @@ import data from './items.json';
 
 // Shop items. Each one is an entry in items.json; cosmetics.ts turns its
 // "shape" (top-down, in the game) and "front" (front view, in dialogue and
-// the locker) recipes and colours into drawings. Default items (beanie, magenta vest,
-// no sign) are always owned and are not listed here.
+// the locker) recipes and colours into drawings. A haircolor item is only a colour. Default items (beanie,
+// magenta vest, no sign, brown hair) are always owned and are not listed here.
 
-export type ItemCategory = 'hat' | 'outfit' | 'sign';
+export type ItemCategory = 'hat' | 'outfit' | 'sign' | 'haircolor';
 
 export interface ShopItem {
   id: string;
@@ -22,20 +22,22 @@ export interface ShopItem {
   accent: string;
 }
 
-export const CATEGORIES: ItemCategory[] = ['hat', 'outfit', 'sign'];
+export const CATEGORIES: ItemCategory[] = ['hat', 'outfit', 'sign', 'haircolor'];
 
 /** Top-down shapes cosmetics.ts knows how to draw, per category. */
 export const SHAPES: Record<ItemCategory, string[]> = {
-  hat: ['bandana', 'beret', 'hardhat', 'crown'],
-  outfit: ['tracksuit', 'jersey', 'poncho', 'cape'],
-  sign: ['placard', 'lollipop', 'flag', 'banner'],
+  hat: ['bandana', 'beret', 'hardhat', 'crown', 'flowers'],
+  outfit: ['tracksuit', 'jersey', 'poncho', 'cape', 'studded', 'scarf'],
+  sign: ['placard', 'lollipop', 'flag', 'banner', 'star'],
+  haircolor: ['color'],
 };
 
 /** Front-view shapes cosmetics.ts knows how to draw, per category. */
 export const FRONT_SHAPES: Record<ItemCategory, string[]> = {
-  hat: ['bandana', 'beret', 'hardhat', 'crown'],
-  outfit: ['tracksuit', 'jersey', 'poncho', 'cape'],
-  sign: ['placard', 'lollipop', 'flag', 'banner'],
+  hat: ['bandana', 'beret', 'hardhat', 'crown', 'flowers'],
+  outfit: ['tracksuit', 'jersey', 'poncho', 'cape', 'studded', 'scarf'],
+  sign: ['placard', 'lollipop', 'flag', 'banner', 'star'],
+  haircolor: ['color'],
 };
 
 export const ITEMS: ShopItem[] = (data as ShopItem[]).map((item, i) => validate(item, i));

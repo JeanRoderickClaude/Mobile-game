@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ITEMS, type ShopItem } from '../data/items';
+import { ITEMS, type ItemCategory, type ShopItem } from '../data/items';
 
 type G = Phaser.GameObjects.Graphics;
 
@@ -74,6 +74,20 @@ function shirt(color: number, trim: number): OutfitStyle {
   };
 }
 
+/** A tee with three stripes across the chest and belly. */
+function stripes(color: number, trim: number, stripe: number): OutfitStyle {
+  return {
+    draw: (g) => {
+      shirt(color, trim).draw(g);
+      g.fillStyle(stripe, 1).fillRect(-12, -4, 24, 2.5).fillRect(-13, 1, 26, 2.5).fillRect(-12, 6, 24, 2.5);
+    },
+    front: (g) => {
+      shirtFront(g, color, trim);
+      g.fillStyle(stripe, 1).fillRect(-11, -40, 22, 2.5).fillRect(-11, -34, 22, 2.5).fillRect(-11, -28, 22, 2.5);
+    },
+  };
+}
+
 function hoodie(color: number, trim: number, hood: number): OutfitStyle {
   return {
     draw: (g) => {
@@ -98,6 +112,17 @@ export const OUTFITS: Record<string, OutfitStyle> = {
   'tee-teal': shirt(0x3aa8a0, 0x23716b),
   'tee-grey': shirt(0x9a9ca6, 0x63656e),
   'tee-white': shirt(0xeeeeee, 0xa8a8a8),
+  'tee-pink': shirt(0xf06fb0, 0xa83f78),
+  'tee-yellow': shirt(0xf2c94c, 0xb8901f),
+  'tee-lime': shirt(0x8fd14f, 0x5b9a28),
+  'tee-purple': shirt(0x8a5fd6, 0x5a3a99),
+  'tee-coral': shirt(0xff7a63, 0xb84a38),
+  'tee-sky': shirt(0x62c6f0, 0x3a8bb0),
+  'stripe-red': stripes(0xf4efe6, 0xa8a49b, 0xe0524f),
+  'stripe-navy': stripes(0xf4efe6, 0xa8a49b, 0x34509e),
+  'stripe-green': stripes(0xf4efe6, 0xa8a49b, 0x3aa86b),
+  'hoodie-purple': hoodie(0x7b4fc4, 0x4f2f85, 0x5f3aa0),
+  'hoodie-red': hoodie(0xd9443f, 0x8f2a27, 0xb23631),
   'hoodie-green': hoodie(0x3f9e5a, 0x276b3b, 0x2f7d45),
   'hoodie-navy': hoodie(0x34416b, 0x1f2742, 0x283356),
   'hoodie-brown': hoodie(0x8a5a3c, 0x5a3823, 0x6e472f),
@@ -195,47 +220,194 @@ export const SIGNS: Record<string, SignStyle> = {
   none: NOTHING,
 };
 
+// --- Hair -------------------------------------------------------------------------
+// A hair layer between the head and the hat, so hats hide hair where they overlap.
+// draw: top-down, head circle radius 8 at (0, 0), face toward -y.
+// back / front: front view, head circle radius 9 at (0, -53). back is drawn behind the head (long hair,
+// the back of a bob), front over the head and under the hat (the cap of hair, fringe, spikes).
+
+export interface HairStyle {
+  draw: (g: G, c: number) => void;
+  back: (g: G, c: number) => void;
+  front: (g: G, c: number) => void;
+}
+
+/** Hair colours: the player's (shop ids "hc-...") and the ones protestors and the cast wear. */
+export const HAIR_COLORS: Record<string, number> = {
+  'hc-brown': 0x6b3f22, // the player's own colour, always owned
+  black: 0x231c2a,
+  brown: 0x6b3f22,
+  darkbrown: 0x2b1d14,
+  gold: 0xc9923e,
+  blonde: 0xf2cc55,
+  ginger: 0xdb5a1e,
+  white: 0xe9e6f0,
+  red: 0xe0314b,
+  pink: 0xff5fae,
+  teal: 0x1fcfba,
+  lime: 0xa0e32e,
+  violet: 0x9a56ff,
+  orange: 0xff8a1f,
+  blue: 0x3a86ff,
+};
+
+/** Spikes around the head from above: n triangles from radius r0 out to r1. */
+function ring(g: G, n: number, r0: number, r1: number, spread: number, phase = 0): void {
+  for (let i = 0; i < n; i++) {
+    const a = phase + (i / n) * Math.PI * 2;
+    g.fillTriangle(
+      Math.cos(a - spread) * r0, Math.sin(a - spread) * r0,
+      Math.cos(a + spread) * r0, Math.sin(a + spread) * r0,
+      Math.cos(a) * r1, Math.sin(a) * r1,
+    );
+  }
+}
+
+const NO_HAIR: HairStyle = { draw: () => {}, back: () => {}, front: () => {} };
+
+export const HAIRSTYLES: Record<string, HairStyle> = {
+  none: NO_HAIR,
+  buzz: {
+    draw: (g, c) => { g.fillStyle(c, 1).fillCircle(0, 1.6, 8.3); },
+    back: () => {},
+    front: (g, c) => { dome(g, c, 9.6, -54.5); },
+  },
+  spiky: {
+    draw: (g, c) => {
+      g.fillStyle(c, 1);
+      ring(g, 9, 6.5, 13.5, 0.4, 0.3);
+      g.fillCircle(0, 1.2, 8.2);
+    },
+    back: () => {},
+    front: (g, c) => {
+      g.fillStyle(c, 1);
+      for (const [x, h] of [[-8, 6], [-4, 9], [0, 11], [4, 9], [8, 6]]) g.fillTriangle(x - 3.4, -58, x + 3.4, -58, x + x * 0.12, -61 - h);
+      dome(g, c, 9.8, -55);
+    },
+  },
+  mohawk: {
+    draw: (g, c) => {
+      g.fillStyle(c, 1);
+      g.fillTriangle(-3.6, -9, 3.6, -9, 0, -16);
+      g.fillRoundedRect(-3.6, -10, 7.2, 24, 3);
+      g.fillTriangle(-3.6, 13, 3.6, 13, 0, 19);
+    },
+    back: () => {},
+    front: (g, c) => {
+      g.fillStyle(c, 1);
+      g.fillTriangle(-4.5, -60, 4.5, -60, 0, -79);
+      g.fillTriangle(-4.5, -64, -1, -72, -7.5, -70);
+      g.fillRoundedRect(-4, -72, 8, 17, 3);
+    },
+  },
+  bob: {
+    draw: (g, c) => { g.fillStyle(c, 1).fillCircle(0, 1, 10.6); },
+    back: (g, c) => { g.fillStyle(c, 1).fillRoundedRect(-11.5, -63, 23, 24, 7); },
+    front: (g, c) => {
+      dome(g, c, 10.4, -55);
+      g.fillStyle(c, 1).fillRoundedRect(-9.6, -60, 19.2, 6.5, 2.5);
+    },
+  },
+  long: {
+    draw: (g, c) => {
+      g.fillStyle(c, 1);
+      g.fillEllipse(0, 11, 18, 21);
+      g.fillCircle(0, 1.2, 9.2);
+    },
+    back: (g, c) => { g.fillStyle(c, 1).fillRoundedRect(-12, -63, 24, 36, 8); },
+    front: (g, c) => {
+      dome(g, c, 10.4, -55);
+      g.fillStyle(c, 1).fillRoundedRect(-10.4, -60, 8, 14, 3).fillRoundedRect(2.4, -60, 8, 14, 3);
+    },
+  },
+  curly: {
+    draw: (g, c) => {
+      g.fillStyle(c, 1);
+      for (let i = 0; i < 8; i++) g.fillCircle(Math.cos((i / 8) * Math.PI * 2) * 8.4, Math.sin((i / 8) * Math.PI * 2) * 8.4, 4.8);
+      g.fillCircle(0, 0, 9);
+    },
+    back: (g, c) => { g.fillStyle(c, 1).fillCircle(0, -56, 14.5); },
+    front: (g, c) => { g.fillStyle(c, 1).fillCircle(-5.5, -61, 4.4).fillCircle(0, -63.5, 4.8).fillCircle(5.5, -61, 4.4); },
+  },
+  ponytail: {
+    draw: (g, c) => {
+      g.fillStyle(c, 1);
+      g.fillEllipse(0, 12, 6, 14);
+      g.fillCircle(0, 1.5, 8.4);
+    },
+    back: (g, c) => { g.fillStyle(c, 1).fillEllipse(11.5, -47, 7, 17); },
+    front: (g, c) => { dome(g, c, 9.9, -54.5); },
+  },
+  bun: {
+    draw: (g, c) => {
+      g.fillStyle(c, 1);
+      g.fillCircle(0, 9.5, 4.8);
+      g.fillCircle(0, 1.5, 8.4);
+    },
+    back: () => {},
+    front: (g, c) => {
+      dome(g, c, 9.9, -54.5);
+      g.fillStyle(c, 1).fillCircle(0, -67, 5);
+    },
+  },
+};
+
+// Hairstyles protestors wear (every one but none), so crowds look different from one another.
+export const PROTESTOR_HAIRSTYLES = Object.keys(HAIRSTYLES).filter((id) => id !== 'none');
+export const PROTESTOR_HAIR_COLORS = ['black', 'brown', 'blonde', 'ginger', 'white', 'red', 'pink', 'teal', 'lime', 'violet', 'orange', 'blue'];
+
 export interface PlayerLook {
   body: keyof typeof BODIES;
   outfit: keyof typeof OUTFITS;
   hat: keyof typeof HATS;
   sign: keyof typeof SIGNS;
+  hair: keyof typeof HAIRSTYLES;
+  hairColor: keyof typeof HAIR_COLORS;
 }
 
-export const DEFAULT_LOOK: PlayerLook = { body: 'light', outfit: 'vest-magenta', hat: 'beanie', sign: 'none' };
+export const DEFAULT_LOOK: PlayerLook = { body: 'light', outfit: 'vest-magenta', hat: 'beanie', sign: 'none', hair: 'spiky', hairColor: 'hc-brown' };
+
+/** The key of PlayerLook that a shop category sets. */
+export const LOOK_KEY: Record<ItemCategory, keyof PlayerLook> = { hat: 'hat', outfit: 'outfit', sign: 'sign', haircolor: 'hairColor' };
 
 // Pools that fellow protestors draw from. Taken before the shop items are
 // added below, so bought items and the player's default outfit stay unique.
 export const PROTESTOR_OUTFITS = Object.keys(OUTFITS).filter((id) => id !== DEFAULT_LOOK.outfit);
 export const PROTESTOR_HATS = Object.keys(HATS);
 
-export function randomProtestorLook(): PlayerLook {
-  return {
-    body: Phaser.Utils.Array.GetRandom(Object.keys(BODIES)),
-    outfit: Phaser.Utils.Array.GetRandom(PROTESTOR_OUTFITS),
-    hat: Phaser.Utils.Array.GetRandom(PROTESTOR_HATS),
-    sign: 'none',
+// Protestor looks come from a fixed pool made once, so a crowd that keeps spawning reuses the same few
+// dozen baked textures. The pool is seeded: crowds look the same on every launch.
+const LOOK_POOL_SIZE = 72;
+let lookPool: PlayerLook[] | null = null;
+
+function makeLookPool(): PlayerLook[] {
+  let seed = 20250;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) | 0;
+    return (seed >>> 0) / 4294967296;
   };
+  const pick = <T,>(list: T[]): T => list[Math.floor(rand() * list.length)];
+  const bodies = Object.keys(BODIES);
+  const hats = PROTESTOR_HATS.filter((id) => id !== 'none');
+  return Array.from({ length: LOOK_POOL_SIZE }, () => ({
+    body: pick(bodies),
+    outfit: pick(PROTESTOR_OUTFITS),
+    // Most go bare-headed so the hair shows.
+    hat: rand() < 0.5 ? 'none' : pick(hats),
+    sign: 'none',
+    hair: pick(PROTESTOR_HAIRSTYLES),
+    hairColor: pick(PROTESTOR_HAIR_COLORS),
+  }));
+}
+
+export function randomProtestorLook(): PlayerLook {
+  lookPool ??= makeLookPool();
+  return { ...Phaser.Utils.Array.GetRandom(lookPool) };
 }
 
 // --- Story cast ---------------------------------------------------------------
 // Worn only by dialogue characters (src/story/cast.json). Added after the
 // protestor pools above, so crowds never wear them.
-
-/** Hair, drawn in the hat layer for cast members without a hat. */
-function hair(color: number, bun: boolean): HatStyle {
-  return {
-    draw: (g) => {
-      g.fillStyle(color, 1).fillCircle(0, 1.5, 8.5);
-      if (bun) g.fillCircle(0, 9, 3.5);
-    },
-    front: (g) => {
-      dome(g, color, 9.8, -53);
-      g.fillStyle(color, 1).fillRect(-9.8, -54, 3, 7).fillRect(6.8, -54, 3, 7);
-      if (bun) g.fillCircle(0, -65, 4.5);
-    },
-  };
-}
 
 const CAST_OUTFITS: Record<string, OutfitStyle> = {
   'squad-uniform': {
@@ -299,19 +471,19 @@ const CAST_HATS: Record<string, HatStyle> = {
       g.fillStyle(0xf2c94c, 1).fillCircle(0, -61, 2);
     },
   },
-  'hair-bun': hair(0x2b1d14, true),
-  'hair-bob': hair(0xb07a3a, false),
 };
 
 Object.assign(OUTFITS, CAST_OUTFITS);
 
-/** A commuter in a gray suit, with plain hair or a gray beanie. */
+/** A commuter in a gray suit, with plain hair in a natural colour or a gray beanie. */
 export function commuterLook(): PlayerLook {
   return {
     body: Phaser.Utils.Array.GetRandom(Object.keys(BODIES)),
     outfit: 'gray-suit',
-    hat: Phaser.Utils.Array.GetRandom(['hair-bob', 'hair-bun', 'none', 'beanie-grey']),
+    hat: Phaser.Utils.Array.GetRandom(['none', 'none', 'beanie-grey']),
     sign: 'none',
+    hair: Phaser.Utils.Array.GetRandom(['buzz', 'bob', 'bun', 'ponytail']),
+    hairColor: Phaser.Utils.Array.GetRandom(['black', 'brown', 'darkbrown', 'white']),
   };
 }
 Object.assign(HATS, CAST_HATS);
@@ -320,7 +492,42 @@ Object.assign(HATS, CAST_HATS);
 
 type Recipe = (g: G, color: number, accent: number) => void;
 
+/** A five-pointed star as one outlined path. */
+function star(g: G, cx: number, cy: number, outer: number, inner: number): void {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = -Math.PI / 2 + (i / 10) * Math.PI * 2;
+    if (i === 0) g.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    else g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+  }
+  g.closePath();
+  g.fillPath();
+}
+
+/** Small squares in a checker pattern inside a box, for the scarf. */
+function checks(g: G, x: number, y: number, w: number, h: number, size: number, color: number): void {
+  g.fillStyle(color, 1);
+  for (let j = 0; j * size < h; j++) {
+    for (let i = 0; i * size < w; i++) {
+      if ((i + j) % 2 === 0) g.fillRect(x + i * size, y + j * size, Math.min(size, w - i * size), Math.min(size, h - j * size));
+    }
+  }
+}
+
 const HAT_SHAPES: Record<string, Recipe> = {
+  flowers: (g, c, a) => {
+    // A ring of flowers round the head, with leaves between.
+    for (let i = 0; i < 8; i++) {
+      const t = (i / 8) * Math.PI * 2;
+      g.fillStyle(0x3fae5a, 1).fillCircle(Math.cos(t + 0.4) * 8.6, Math.sin(t + 0.4) * 8.6, 3.2);
+    }
+    for (let i = 0; i < 7; i++) {
+      const t = (i / 7) * Math.PI * 2 - Math.PI / 2;
+      g.fillStyle(i % 2 === 0 ? c : a, 1).fillCircle(Math.cos(t) * 8.6, Math.sin(t) * 8.6, 4);
+      g.fillStyle(0xfff3c4, 1).fillCircle(Math.cos(t) * 8.6, Math.sin(t) * 8.6, 1.4);
+    }
+  },
   bandana: (g, c, a) => {
     g.fillStyle(c, 1).fillCircle(0, 0.5, 8.5);
     // Knot and two tails at the back of the head.
@@ -358,6 +565,22 @@ const HAT_SHAPES: Record<string, Recipe> = {
 };
 
 const OUTFIT_SHAPES: Record<string, Recipe> = {
+  studded: (g, c, a) => {
+    shirt(c, darken(c)).draw(g);
+    // Spiked shoulders, a zip and a row of studs across the back.
+    g.fillStyle(a, 1);
+    g.fillTriangle(-17, 0, -11, -5, -11, 4).fillTriangle(17, 0, 11, -5, 11, 4);
+    g.fillRect(-0.75, -6, 1.5, 15);
+    for (let x = -9; x <= 9; x += 4.5) g.fillCircle(x, 7, 1.4);
+  },
+  scarf: (g, c, a) => {
+    shirt(0x4a6fa5, 0x2f4a73).draw(g);
+    // Checkered scarf round the neck with a tail down the back.
+    g.fillStyle(c, 1).fillRect(-3.5, 6, 7, 11);
+    checks(g, -3.5, 6, 7, 11, 3.5, a);
+    g.fillStyle(c, 1).fillEllipse(0, 0, 22, 14);
+    for (const [x, y] of [[-8, -2], [-4, 2], [0, -4], [4, 2], [8, -2], [-4, -4], [4, -4]]) g.fillStyle(a, 1).fillRect(x - 1.7, y - 1.7, 3.4, 3.4);
+  },
   tracksuit: (g, c, a) => {
     shirt(c, darken(c)).draw(g);
     g.fillStyle(a, 1);
@@ -387,6 +610,12 @@ const OUTFIT_SHAPES: Record<string, Recipe> = {
 };
 
 const SIGN_SHAPES: Record<string, Recipe> = {
+  star: (g, c, a) => {
+    g.fillStyle(0x8a6a44, 1).fillRect(13.5, -18, 3, 20);
+    g.fillStyle(c, 1);
+    star(g, 15, -27, 12, 5.5);
+    g.fillStyle(a, 1).fillCircle(15, -27, 3);
+  },
   placard: (g, c, a) => {
     g.fillStyle(0x8a6a44, 1).fillRect(13.5, -24, 3, 26); // stick from the right hand
     g.fillStyle(c, 1).fillRect(-6, -32, 26, 15);
@@ -421,6 +650,15 @@ function darken(color: number): number {
 
 // Front-view recipes, in the front-view space described at the top of the file.
 const FRONT_HAT_SHAPES: Record<string, Recipe> = {
+  flowers: (g, c, a) => {
+    for (let i = -4; i <= 4; i++) {
+      const x = i * 2.5;
+      const y = -61 + i * i * 0.2;
+      g.fillStyle(0x3fae5a, 1).fillCircle(x + 1.2, y + 1.8, 2.4);
+      g.fillStyle(i % 2 === 0 ? c : a, 1).fillCircle(x, y, 3.2);
+      g.fillStyle(0xfff3c4, 1).fillCircle(x, y, 1.1);
+    }
+  },
   bandana: (g, c, a) => {
     dome(g, c, 10, -53);
     g.fillStyle(c, 1).fillRect(-10, -54, 20, 3);
@@ -447,6 +685,22 @@ const FRONT_HAT_SHAPES: Record<string, Recipe> = {
 };
 
 const FRONT_OUTFIT_SHAPES: Record<string, Recipe> = {
+  studded: (g, c, a) => {
+    shirtFront(g, c, darken(c));
+    g.fillStyle(a, 1);
+    g.fillTriangle(-8, -44, -2, -44, -5, -33).fillTriangle(8, -44, 2, -44, 5, -33); // lapels
+    g.fillTriangle(-17, -43, -11, -47, -11, -40).fillTriangle(17, -43, 11, -47, 11, -40); // shoulder spikes
+    g.fillRect(-0.75, -34, 1.5, 17);
+    for (const [x, y] of [[-8, -30], [-8, -25], [-8, -20], [8, -30], [8, -25], [8, -20], [-14, -38], [14, -38]]) g.fillCircle(x, y, 1.4);
+    g.fillStyle(0x15111a, 1).fillRect(-11, -20, 22, 3);
+  },
+  scarf: (g, c, a) => {
+    shirtFront(g, 0x4a6fa5, 0x2f4a73);
+    g.fillStyle(c, 1).fillRect(2, -43, 7, 19);
+    checks(g, 2, -43, 7, 19, 3.5, a);
+    g.fillStyle(c, 1).fillRoundedRect(-10.5, -48, 21, 7, 3);
+    checks(g, -10.5, -48, 21, 7, 3.5, a);
+  },
   tracksuit: (g, c, a) => {
     shirtFront(g, c, darken(c));
     g.fillStyle(a, 1);
@@ -475,6 +729,12 @@ const FRONT_OUTFIT_SHAPES: Record<string, Recipe> = {
 };
 
 const FRONT_SIGN_SHAPES: Record<string, Recipe> = {
+  star: (g, c, a) => {
+    g.fillStyle(0x8a6a44, 1).fillRect(11.5, -72, 3, 50);
+    g.fillStyle(c, 1);
+    star(g, 13, -88, 15, 7);
+    g.fillStyle(a, 1).fillCircle(13, -88, 4);
+  },
   placard: (g, c, a) => {
     g.fillStyle(0x8a6a44, 1).fillRect(11.5, -72, 3, 50);
     g.fillStyle(c, 1).fillRect(-4, -92, 34, 22);
@@ -506,20 +766,26 @@ function hex(color: string): number {
 }
 
 function shopStyle(item: ShopItem): ItemStyle {
-  const top = { hat: HAT_SHAPES, outfit: OUTFIT_SHAPES, sign: SIGN_SHAPES }[item.category][item.shape];
-  const front = { hat: FRONT_HAT_SHAPES, outfit: FRONT_OUTFIT_SHAPES, sign: FRONT_SIGN_SHAPES }[item.category][item.front];
+  const category = item.category as Exclude<ItemCategory, 'haircolor'>;
+  const top = { hat: HAT_SHAPES, outfit: OUTFIT_SHAPES, sign: SIGN_SHAPES }[category][item.shape];
+  const front = { hat: FRONT_HAT_SHAPES, outfit: FRONT_OUTFIT_SHAPES, sign: FRONT_SIGN_SHAPES }[category][item.front];
   const color = hex(item.color);
   const accent = hex(item.accent);
   return { draw: (g) => top(g, color, accent), front: (g) => front(g, color, accent) };
 }
 
 const TABLES = { hat: HATS, outfit: OUTFITS, sign: SIGNS };
-for (const item of ITEMS) TABLES[item.category][item.id] = shopStyle(item);
+for (const item of ITEMS) {
+  if (item.category === 'haircolor') HAIR_COLORS[item.id] = hex(item.color);
+  else TABLES[item.category as keyof typeof TABLES][item.id] = shopStyle(item);
+}
 
 /** The item each category starts with, always owned. */
-export const DEFAULT_ITEMS = { hat: DEFAULT_LOOK.hat, outfit: DEFAULT_LOOK.outfit, sign: DEFAULT_LOOK.sign };
+export const DEFAULT_ITEMS: Record<ItemCategory, string> = {
+  hat: DEFAULT_LOOK.hat, outfit: DEFAULT_LOOK.outfit, sign: DEFAULT_LOOK.sign, haircolor: DEFAULT_LOOK.hairColor,
+};
 
 /** True when id names something that category can draw. */
-export function isKnownItem(category: keyof typeof TABLES, id: string): boolean {
-  return Object.hasOwn(TABLES[category], id);
+export function isKnownItem(category: ItemCategory, id: string): boolean {
+  return Object.hasOwn(category === 'haircolor' ? HAIR_COLORS : TABLES[category], id);
 }

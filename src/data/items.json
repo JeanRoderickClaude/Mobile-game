@@ -1,16 +1,30 @@
 [
-  { "id": "hat-bandana", "name": "Bandana", "category": "hat", "price": 120, "shape": "bandana", "front": "bandana", "color": "#c0392b", "accent": "#f4f4f4" },
-  { "id": "hat-beret", "name": "Beret", "category": "hat", "price": 200, "shape": "beret", "front": "beret", "color": "#2b2d42", "accent": "#e63946" },
-  { "id": "hat-hardhat", "name": "Hard hat", "category": "hat", "price": 320, "shape": "hardhat", "front": "hardhat", "color": "#f2b705", "accent": "#c48f00" },
-  { "id": "hat-crown", "name": "Crown", "category": "hat", "price": 560, "shape": "crown", "front": "crown", "color": "#f2c94c", "accent": "#e0524f" },
+  {"id": "hat-bandana", "name": "Bandana", "category": "hat", "price": 120, "shape": "bandana", "front": "bandana", "color": "#c0392b", "accent": "#f4f4f4"},
+  {"id": "hat-beret", "name": "Beret", "category": "hat", "price": 200, "shape": "beret", "front": "beret", "color": "#2b2d42", "accent": "#e63946"},
+  {"id": "hat-hardhat", "name": "Hard hat", "category": "hat", "price": 320, "shape": "hardhat", "front": "hardhat", "color": "#f2b705", "accent": "#c48f00"},
+  {"id": "hat-crown", "name": "Crown", "category": "hat", "price": 560, "shape": "crown", "front": "crown", "color": "#f2c94c", "accent": "#e0524f"},
 
-  { "id": "outfit-tracksuit", "name": "Tracksuit", "category": "outfit", "price": 150, "shape": "tracksuit", "front": "tracksuit", "color": "#2f6fd6", "accent": "#ffffff" },
-  { "id": "outfit-jersey", "name": "Jersey", "category": "outfit", "price": 240, "shape": "jersey", "front": "jersey", "color": "#16a085", "accent": "#f2c94c" },
-  { "id": "outfit-poncho", "name": "Poncho", "category": "outfit", "price": 380, "shape": "poncho", "front": "poncho", "color": "#e8913a", "accent": "#7b2d8e" },
-  { "id": "outfit-cape", "name": "Hero cape", "category": "outfit", "price": 600, "shape": "cape", "front": "cape", "color": "#d62828", "accent": "#f2c94c" },
+  {"id": "outfit-tracksuit", "name": "Tracksuit", "category": "outfit", "price": 150, "shape": "tracksuit", "front": "tracksuit", "color": "#2f6fd6", "accent": "#ffffff"},
+  {"id": "outfit-jersey", "name": "Jersey", "category": "outfit", "price": 240, "shape": "jersey", "front": "jersey", "color": "#16a085", "accent": "#f2c94c"},
+  {"id": "outfit-poncho", "name": "Poncho", "category": "outfit", "price": 380, "shape": "poncho", "front": "poncho", "color": "#e8913a", "accent": "#7b2d8e"},
+  {"id": "outfit-cape", "name": "Hero cape", "category": "outfit", "price": 600, "shape": "cape", "front": "cape", "color": "#d62828", "accent": "#f2c94c"},
 
-  { "id": "sign-placard", "name": "Cardboard sign", "category": "sign", "price": 120, "shape": "placard", "front": "placard", "color": "#c8a46e", "accent": "#3a2a1a" },
-  { "id": "sign-lollipop", "name": "Round sign", "category": "sign", "price": 220, "shape": "lollipop", "front": "lollipop", "color": "#ffffff", "accent": "#e0524f" },
-  { "id": "sign-flag", "name": "Flag", "category": "sign", "price": 340, "shape": "flag", "front": "flag", "color": "#7be08f", "accent": "#1d1f2b" },
-  { "id": "sign-banner", "name": "Banner", "category": "sign", "price": 520, "shape": "banner", "front": "banner", "color": "#ff3fa4", "accent": "#ffffff" }
+  {"id": "sign-placard", "name": "Cardboard sign", "category": "sign", "price": 120, "shape": "placard", "front": "placard", "color": "#c8a46e", "accent": "#3a2a1a"},
+  {"id": "sign-lollipop", "name": "Round sign", "category": "sign", "price": 220, "shape": "lollipop", "front": "lollipop", "color": "#ffffff", "accent": "#e0524f"},
+  {"id": "sign-flag", "name": "Flag", "category": "sign", "price": 340, "shape": "flag", "front": "flag", "color": "#7be08f", "accent": "#1d1f2b"},
+  {"id": "sign-banner", "name": "Banner", "category": "sign", "price": 520, "shape": "banner", "front": "banner", "color": "#ff3fa4", "accent": "#ffffff"},
+
+  {"id": "hat-flowers", "name": "Flower crown", "category": "hat", "price": 260, "shape": "flowers", "front": "flowers", "color": "#ff6fa8", "accent": "#ffd23f"},
+
+  {"id": "outfit-studded", "name": "Studded jacket", "category": "outfit", "price": 450, "shape": "studded", "front": "studded", "color": "#2a2433", "accent": "#c9d3dc"},
+  {"id": "outfit-scarf", "name": "Checkered scarf", "category": "outfit", "price": 320, "shape": "scarf", "front": "scarf", "color": "#d94545", "accent": "#f6efe0"},
+
+  {"id": "sign-star", "name": "Star sign", "category": "sign", "price": 400, "shape": "star", "front": "star", "color": "#ffd23f", "accent": "#ff3fa4"},
+
+  {"id": "hc-pink", "name": "Pink hair", "category": "haircolor", "price": 120, "shape": "color", "front": "color", "color": "#ff5fae", "accent": "#ff5fae"},
+  {"id": "hc-teal", "name": "Teal hair", "category": "haircolor", "price": 160, "shape": "color", "front": "color", "color": "#1fcfba", "accent": "#1fcfba"},
+  {"id": "hc-lime", "name": "Lime hair", "category": "haircolor", "price": 200, "shape": "color", "front": "color", "color": "#a0e32e", "accent": "#a0e32e"},
+  {"id": "hc-orange", "name": "Orange hair", "category": "haircolor", "price": 240, "shape": "color", "front": "color", "color": "#ff8a1f", "accent": "#ff8a1f"},
+  {"id": "hc-violet", "name": "Violet hair", "category": "haircolor", "price": 300, "shape": "color", "front": "color", "color": "#9a56ff", "accent": "#9a56ff"},
+  {"id": "hc-blue", "name": "Blue hair", "category": "haircolor", "price": 360, "shape": "color", "front": "color", "color": "#3a86ff", "accent": "#3a86ff"}
 ]

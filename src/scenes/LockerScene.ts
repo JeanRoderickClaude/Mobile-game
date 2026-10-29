@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_WIDTH } from '../config';
 import { Character } from '../entities/Character';
-import { DEFAULT_ITEMS, DEFAULT_LOOK, type PlayerLook } from '../entities/cosmetics';
+import { DEFAULT_ITEMS, DEFAULT_LOOK, LOOK_KEY, type PlayerLook } from '../entities/cosmetics';
 import { CATEGORIES, ITEMS, type ItemCategory, type ShopItem } from '../data/items';
 import { buy, equip, equippedId, equippedLook, getCoins, owns } from '../systems/save';
 import { CoinLabel, FONT, FONT_BOLD, makeButton, type Button } from '../ui/widgets';
 
-const TAB_LABELS: Record<ItemCategory, string> = { hat: 'Hats', outfit: 'Outfits', sign: 'Signs' };
-const DEFAULT_NAMES: Record<ItemCategory, string> = { hat: 'Beanie', outfit: 'Magenta vest', sign: 'No sign' };
+const TAB_LABELS: Record<ItemCategory, string> = { hat: 'Hats', outfit: 'Outfits', sign: 'Signs', haircolor: 'Hair' };
+const DEFAULT_NAMES: Record<ItemCategory, string> = { hat: 'Beanie', outfit: 'Magenta vest', sign: 'No sign', haircolor: 'Brown hair' };
 
 /** A tile in the grid: the default item of a category or a shop item. */
 interface Entry {
@@ -22,10 +22,11 @@ interface Tile {
   status: Phaser.GameObjects.Text;
 }
 
-const TILE_W = 160;
+const TILE_W = 124;
 const TILE_H = 150;
-const COLS = [95, 270, 445];
+const COLS = [74, 208, 342, 476]; // four tiles a row, two rows: up to eight tiles per tab
 const ROWS = [620, 784];
+const TAB_X = [74, 208, 342, 476];
 
 /**
  * The locker room shop. The big character previews whatever tile is tapped;
@@ -67,9 +68,9 @@ export class LockerScene extends Phaser.Scene {
     this.previewName = this.add.text(cx, 445, '', { fontFamily: FONT_BOLD, fontSize: '26px', color: '#ffffff' }).setOrigin(0.5);
 
     CATEGORIES.forEach((category, i) => {
-      const x = COLS[i];
-      const bg = this.add.rectangle(x, 500, 160, 52, 0x34374a).setStrokeStyle(2, 0xffffff, 0.3).setInteractive({ useHandCursor: true });
-      const label = this.add.text(x, 500, TAB_LABELS[category], { fontFamily: FONT_BOLD, fontSize: '22px', color: '#ffffff' }).setOrigin(0.5);
+      const x = TAB_X[i];
+      const bg = this.add.rectangle(x, 500, 124, 52, 0x34374a).setStrokeStyle(2, 0xffffff, 0.3).setInteractive({ useHandCursor: true });
+      const label = this.add.text(x, 500, TAB_LABELS[category], { fontFamily: FONT_BOLD, fontSize: '20px', color: '#ffffff' }).setOrigin(0.5);
       bg.on('pointerup', () => this.showCategory(category));
       this.tabs.set(category, { bg, label });
     });
@@ -97,15 +98,16 @@ export class LockerScene extends Phaser.Scene {
     this.tiles = [];
 
     this.entries(category).forEach((entry, i) => {
-      const x = COLS[i % 3];
-      const y = ROWS[Math.floor(i / 3)];
+      const x = COLS[i % 4];
+      const y = ROWS[Math.floor(i / 4)];
       const frame = this.add.rectangle(x, y, TILE_W, TILE_H, 0x2a2d3c).setInteractive({ useHandCursor: true });
       frame.on('pointerup', () => this.select(entry.id));
       // Mini character wearing just this item on top of the default look.
-      const look: PlayerLook = { ...DEFAULT_LOOK, [category]: entry.id };
+      // Hair colour tiles go bare-headed, so the hair shows from above.
+      const look: PlayerLook = { ...DEFAULT_LOOK, [LOOK_KEY[category]]: entry.id, ...(category === 'haircolor' ? { hat: 'none' } : {}) };
       const mini = new Character(this, x, y - 12 + (category === 'sign' ? 14 : 0), look).setScale(category === 'sign' ? 1.6 : 2);
-      const name = this.add.text(x, y + 38, entry.name, { fontFamily: FONT, fontSize: '17px', color: '#ffffff' }).setOrigin(0.5);
-      const status = this.add.text(x, y + 60, '', { fontFamily: FONT_BOLD, fontSize: '16px', color: '#ffffff' }).setOrigin(0.5);
+      const name = this.add.text(x, y + 38, entry.name, { fontFamily: FONT, fontSize: '15px', color: '#ffffff' }).setOrigin(0.5);
+      const status = this.add.text(x, y + 60, '', { fontFamily: FONT_BOLD, fontSize: '14px', color: '#ffffff' }).setOrigin(0.5);
       this.grid.push(frame, mini, name, status);
       this.tiles.push({ entry, frame, status });
     });
@@ -114,7 +116,8 @@ export class LockerScene extends Phaser.Scene {
 
   private select(id: string): void {
     this.selected = id;
-    const look: PlayerLook = { ...equippedLook(), [this.category]: id };
+    // The hair colour preview goes bare-headed so the colour shows.
+    const look: PlayerLook = { ...equippedLook(), [LOOK_KEY[this.category]]: id, ...(this.category === 'haircolor' ? { hat: 'none' } : {}) };
     this.preview.setLook(look);
     this.refresh();
   }

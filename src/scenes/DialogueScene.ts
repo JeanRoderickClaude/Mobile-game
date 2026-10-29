@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { COLORS, GAME_HEIGHT, GAME_WIDTH, PAINTED_GRAY_STRENGTH } from '../config';
 import { noirMatrix } from '../systems/noir';
 import { Character } from '../entities/Character';
 import { matches } from '../story/flags';
@@ -79,6 +79,8 @@ export class DialogueScene extends Phaser.Scene {
   /** Backdrop tone: the filter that grays it, and how gray it is now (0 colour .. 1 gray). */
   private toneMatrix: Phaser.Display.ColorMatrix | null = null;
   private grayness = { value: 0 };
+  /** True when the backdrop is a painted image: it is grayed only PAINTED_GRAY_STRENGTH as much. */
+  private painted = false;
 
   private stage: StageName | null = null;
 
@@ -114,7 +116,8 @@ export class DialogueScene extends Phaser.Scene {
     bg.setInteractive();
     bg.on('pointerdown', () => (this.pressed = true));
     bg.on('pointerup', () => this.pressed && this.advance());
-    const backdrop = this.textures.exists(backdropKey(dialogue.stage)) ? paintedStage(this, dialogue.stage) : drawStage(this, dialogue.stage);
+    this.painted = this.textures.exists(backdropKey(dialogue.stage));
+    const backdrop = this.painted ? paintedStage(this, dialogue.stage) : drawStage(this, dialogue.stage);
     this.toneMatrix = null;
     if (this.game.renderer.type === Phaser.WEBGL) {
       backdrop.enableFilters();
@@ -258,7 +261,7 @@ export class DialogueScene extends Phaser.Scene {
   private setTone(tone: Tone, animate: boolean): void {
     const target = tone === 'gray' ? 1 : 0;
     const apply = () => {
-      const t = this.grayness.value;
+      const t = this.grayness.value * (this.painted ? PAINTED_GRAY_STRENGTH : 1);
       this.toneMatrix?.set(noirMatrix(t));
     };
     this.tweens.killTweensOf(this.grayness);

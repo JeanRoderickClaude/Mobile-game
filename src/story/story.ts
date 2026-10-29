@@ -20,7 +20,7 @@ export interface CastMember {
 
 /** The cast id that always wears the player's equipped look and stands leftmost. */
 export const PLAYER_CAST_ID = 'pip';
-export const CAST_LOOK_DEFAULTS: PlayerLook = { body: 'light', outfit: 'tee-grey', hat: 'none', sign: 'none' };
+export const CAST_LOOK_DEFAULTS: PlayerLook = { body: 'light', outfit: 'tee-grey', hat: 'none', sign: 'none', hair: 'buzz', hairColor: 'brown' };
 
 /** Background strips for the stage. */
 export const STAGES = ['street', 'night', 'harbor', 'cellar'] as const;

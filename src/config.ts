@@ -138,6 +138,8 @@ export const COMMUTER_FOLLOW_SPEED = 60; // and how fast they walk to Pip and ke
 // Noir look for controlled ground (levels with "noir"). Gray areas get a
 // grayscale copy with extra contrast; colour spreads from Pip while he plays.
 export const NOIR_CONTRAST = 0.45; // added contrast in gray areas (0 = plain grayscale)
+/** How much of the gray filter a painted dialogue backdrop gets in a gray scene (0 none, 1 full), so its neon and golden light survive. Drawn backdrops always get the full filter. */
+export const PAINTED_GRAY_STRENGTH = 0.6;
 export const NOIR_AURA_FACTOR = 0.75; // the colour glow around Pip reaches this fraction of the hearing radius
 export const NOIR_AURA_GROW_MS = 500; // glow grows to full size this fast when playing starts
 export const NOIR_AURA_FADE_MS = 1200; // and shrinks away this fast when it stops

@@ -31,6 +31,8 @@ export class Noir {
   private enabled: boolean;
   private mixed: Phaser.Filters.ParallelFilters | null = null; // gray and colour on screen together
   private grayOnly: Phaser.Filters.ColorMatrix | null = null; // the whole screen is gray
+  /** Counts zones that have turned colour, so the atmosphere (reflections, windows) redraws when the ground changes. */
+  revision = 0;
   /** What the last frame needed: one of the three filter setups. */
   mode: 'gray' | 'mixed' | 'color' = 'gray';
 
@@ -72,12 +74,18 @@ export class Noir {
   /** Turns a rectangle coloured for the rest of the run, filling outward from (fromX, fromY). */
   colorArea(rect: Rect, fromX: number, fromY: number): void {
     this.zones.push({ ...rect, start: 'gray', colored: true, left: Infinity, spreadX: fromX, spreadY: fromY, spread: 0 });
+    this.revision++;
   }
 
   /** The zone Pip is in that music can still win, with how much is done (0..1), or null. */
   progressAt(x: number, y: number): number | null {
     const z = this.zones.find((zone) => !zone.colored && zone.left !== Infinity && inside(zone, x, y));
     return z ? 1 - z.left / z.musicMs! : null;
+  }
+
+  /** The zones that are fully coloured now (won, or coloured from the start), for the golden grade drawn over them. */
+  coloredZones(): Rect[] {
+    return this.zones.filter((z) => z.colored && z.spread >= 1);
   }
 
   /** True when the point is coloured permanently (a coloured or won zone). */
@@ -97,6 +105,7 @@ export class Noir {
       }
       if (playing && inside(z, pipX, pipY) && (z.left -= deltaMs) <= 0) {
         z.colored = true;
+        this.revision++;
         z.spread = 0;
         z.spreadX = pipX;
         z.spreadY = pipY;
@@ -140,9 +149,12 @@ export class Noir {
   }
 }
 
+/** The cold grade for gray ground: the gray is not neutral but leans blue (red down, blue up, blue lifted in the shadows). */
+const COLD = { r: 0.86, g: 0.97, b: 1.14, lift: 9 };
+
 /**
  * Colour matrix for the noir look, t from 0 (untouched) to 1 (full gray with
- * NOIR_CONTRAST added contrast around mid-gray). Built by hand: Phaser's
+ * NOIR_CONTRAST added contrast around mid-gray, leaning cold blue). Built by hand: Phaser's
  * ColorMatrix reads offsets in 0..255 units, but its contrast() writes them
  * in 0..1, so its contrast only brightens.
  */
@@ -150,7 +162,12 @@ export function noirMatrix(t: number): number[] {
   const v = 1 + NOIR_CONTRAST;
   const g = v / 3; // equal-weight gray, scaled for contrast
   const o = -0.5 * NOIR_CONTRAST * 255; // keeps mid-gray in place (offsets are in 0..255)
-  const gray = [g, g, g, 0, o, g, g, g, 0, o, g, g, g, 0, o, 0, 0, 0, 1, 0];
+  const gray = [
+    g * COLD.r, g * COLD.r, g * COLD.r, 0, o * COLD.r,
+    g * COLD.g, g * COLD.g, g * COLD.g, 0, o * COLD.g,
+    g * COLD.b, g * COLD.b, g * COLD.b, 0, o * COLD.b + COLD.lift,
+    0, 0, 0, 1, 0,
+  ];
   const identity = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
   return identity.map((a, i) => a + (gray[i] - a) * t);
 }
