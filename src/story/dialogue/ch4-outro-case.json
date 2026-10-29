@@ -1,0 +1,76 @@
+{
+ "stage": "harbor",
+ "tone": "color",
+ "cast": [
+  {
+   "id": "pip",
+   "x": 120
+  },
+  {
+   "id": "jonas",
+   "x": 340,
+   "offstage": true
+  }
+ ],
+ "lines": [
+  {
+   "text": "Old Jonas lives in an upturned boat on the quay: a stove, a lamp, and a smell of tar and warm bread."
+  },
+  {
+   "text": "Pip stands dripping on the floor, out of breath, with Ruby's instrument case in both arms."
+  },
+  {
+   "speaker": "jonas",
+   "text": "You must be the trumpeter. I heard the whistles from here. Sit down before you fall down.",
+   "enter": [
+    "jonas"
+   ]
+  },
+  {
+   "speaker": "pip",
+   "text": "Um. Ruby said to find you. She gave me this."
+  },
+  {
+   "text": "He sets the case on the table. Jonas runs a thumb over the brass latches and says nothing for a long moment."
+  },
+  {
+   "speaker": "jonas",
+   "text": "Her horn. Thirty years she never let anyone else carry it. She trusted it to a kid in the middle of a raid."
+  },
+  {
+   "speaker": "pip",
+   "text": "(A kid. Fine. A kid with very sore arms.)"
+  },
+  {
+   "speaker": "jonas",
+   "text": "A fish cart took Ruby over the back wall before the Squad finished the stairs. She'll come for that case. She always does."
+  },
+  {
+   "speaker": "pip",
+   "text": "She's all right? Really?"
+  },
+  {
+   "speaker": "jonas",
+   "text": "She's Ruby. The Cellar is gone, though. The chairs, the piano, the stage. The Squad took the lot."
+  },
+  {
+   "speaker": "jonas",
+   "text": "Whoever signs these orders wants this town quiet. I would like to know why."
+  },
+  {
+   "speaker": "pip",
+   "text": "Me too. Um. What do we do now?"
+  },
+  {
+   "speaker": "jonas",
+   "text": "We find the ones who are still loud. There's a drummer boy down by the docks. Teun. Loudest kid in Port Murmur, and he can't hide to save his life."
+  },
+  {
+   "speaker": "pip",
+   "text": "(I can't hide either. Maybe two bad hiders add up to one decent one.)"
+  },
+  {
+   "text": "Outside, the rain keeps falling. Somewhere along the docks a drum starts up, very softly, and then not so softly."
+  }
+ ]
+}

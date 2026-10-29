@@ -170,6 +170,8 @@ export interface LevelData {
   tags?: TagSpot[];
   /** Optional. Finish time in seconds that earns the full speed bonus. Default: height / PLAYER_SPEED x PAR_TIME_FACTOR. */
   parTimeSec?: number;
+  /** Optional. Ruby's instrument case lies at (x, y). Pip can pick it up and drop it with the action button; finishing sets `flag` to true when he carries it, false when not. Needs `trumpet: true` (the button is the trumpet's). */
+  instrumentCase?: { x: number; y: number; flag: string };
   /** Optional. Story-flag dependent tuning, applied by resolveLevel. */
   modifiers?: LevelModifier[];
 }

@@ -1,0 +1,91 @@
+{
+ "stage": "cellar",
+ "tone": "color",
+ "cast": [
+  {
+   "id": "pip",
+   "x": 110
+  },
+  {
+   "id": "ruby",
+   "x": 235
+  },
+  {
+   "id": "hush",
+   "x": 360,
+   "offstage": true
+  },
+  {
+   "id": "mute",
+   "x": 470,
+   "offstage": true
+  }
+ ],
+ "lines": [
+  {
+   "text": "Saturday night in the Brass Cellar. Every chair is taken, and forty people are being quietly, gloriously loud."
+  },
+  {
+   "speaker": "ruby",
+   "text": "Listen to that, kid. Thirty years I've waited for a room this full."
+  },
+  {
+   "speaker": "pip",
+   "text": "(They came. Because of the posters. Because of me. Someone should pinch me, gently.)"
+  },
+  {
+   "text": "Upstairs, something heavy hits the door with no handle. It does not knock twice."
+  },
+  {
+   "text": "The door gives way. Flashlight-white light pours down the stairs, and the colors drain out of the room.",
+   "tone": "gray",
+   "enter": [
+    "hush",
+    "mute"
+   ]
+  },
+  {
+   "speaker": "hush",
+   "text": "Brass Cellar. Unlicensed amplification, Section 9, Subsection Hum. Nobody leaves. Nobody plays. Nobody hums."
+  },
+  {
+   "speaker": "mute",
+   "text": "Sergeant, the raid order did not come from the Mayor's office. It came from above that. I do not know who is above that."
+  },
+  {
+   "speaker": "hush",
+   "text": "Above the Mayor is only the law, Mute. Stay calm. Stay measured."
+  },
+  {
+   "speaker": "ruby",
+   "text": "Pip. Look at me. Behind the coat rack is a back door onto Fish Lane. Nobody's watching it yet."
+  },
+  {
+   "speaker": "ruby",
+   "text": "Go to the harbor. Old Jonas keeps a room by the water. My horn case is by that door. Take it if you can carry it, and leave it if you can't."
+  },
+  {
+   "speaker": "pip",
+   "text": "Um. What about you? And everyone else?"
+  },
+  {
+   "speaker": "ruby",
+   "text": "They run faster than you, so don't try to outrun them. But they can't see round a corner. Break their sight, then lose yourself in a crowd."
+  },
+  {
+   "speaker": "ruby",
+   "text": "The whole room is about to pour into the streets. Walk in the middle of them and nobody looks twice."
+  },
+  {
+   "speaker": "ruby",
+   "text": "I've been thrown out of better places than this. Go."
+  },
+  {
+   "speaker": "pip",
+   "text": "(Break their sight. Hide in a crowd. Carry the case, or don't. It's easy. It's easy. Nothing about this is easy.)"
+  },
+  {
+   "text": "Behind the coat rack, a narrow door. Behind the door, Fish Lane, the rain, and a great many whistles."
+  }
+ ]
+}

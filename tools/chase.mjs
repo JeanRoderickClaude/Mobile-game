@@ -12,7 +12,9 @@
 // search ended, every officer back on patrol, with Pip not caught.
 // Usage:
 //   node tools/chase.mjs src/levels/dev/practice-chase.json [--starts 23] [--every 1500]
-//        [--spot 245,1140] [--difficulty easy] [--hold] [--speed 1.1] [--react 400] [--join 1500] [--ahead 3] [--spread 70] [--search 8000] [--drain 4] [--recover 8] [--rest 2] [--tired 0.6] [--alert 300] [--pursuit 3000] [--only flee,hide] [--why]
+//        [--spot 245,1140] [--case] [--flags vanTagged] [--difficulty easy] [--hold] [--speed 1.1] [--react 400] [--join 1500] [--ahead 3] [--spread 70] [--search 8000] [--drain 4] [--recover 8] [--rest 2] [--tired 0.6] [--alert 300] [--pursuit 3000] [--only flee,hide] [--why]
+// --dark 0 stops the hide player from using dark pockets (he then only rides the crowd).
+// --case makes Pip carry Ruby's case (chapter 4: slower, drains stamina faster). --flags a,b starts the level with those story flags true.
 // --speed, --react and --join override the difficulty's chaseSpeedFactor, chaseReactMs and chaseJoinMs
 //         for this run, to try values before putting them in config.ts.
 // Several players run one after another, each in a fresh browser. --hold adds a player who just stands still where he was spotted.
@@ -86,6 +88,8 @@ await run(args._[0], async (page) => {
       const s = await window.__restart();
       // The level must not end at the finish: what is measured is whether the chase ends with Pip free.
       s.level.finish = { x: -5000, y: -5000, width: 1, height: 1 };
+      // --case: Pip carries Ruby's case from the start (at the back exit, within reach of it).
+      if (over.case) s.setCarrying(true);
       // Wait unseen at the start while the officers and the crowd move on.
       for (let t = 0; t < delay; t += STEP) {
         s.player.x = L.start.x; s.player.y = L.start.y;
@@ -100,7 +104,7 @@ await run(args._[0], async (page) => {
       let shotSpot = false, shotSearch = false;
       const wasSearching = [];
       let closeCall = false, noticed = false, minHidden = Infinity;
-      let runTo = finish0, path = [], pathAt = -1e9, sawSearch = false, chaseEndedAt = null, peakChasers = 0, meet = null, meetAt = -1e9, pocketAt = -1e9, fleeAt = -1e9, fleeTarget = null, lostThem = false, pocket = null, atPocket = false;
+      let dark = null, darkAt = -1e9, runTo = finish0, path = [], pathAt = -1e9, sawSearch = false, chaseEndedAt = null, peakChasers = 0, meet = null, meetAt = -1e9, pocketAt = -1e9, fleeAt = -1e9, fleeTarget = null, lostThem = false, pocket = null, atPocket = false;
       const finish = finish0;
       const goTo = (t, gx, gy, push) => {
         if (t - pathAt > 200) { path = nav.findPath(s.player.x, s.player.y, gx, gy); pathAt = t; }
@@ -109,7 +113,7 @@ await run(args._[0], async (page) => {
         const dx = w.x - s.player.x, dy = w.y - s.player.y, d = Math.hypot(dx, dy) || 1;
         s.joystick.vector.set((dx / d) * push, (dy / d) * push);
       };
-      const pathLen = (ax, ay, bx, by, avoid = 130) => {
+      const pathLen = (ax, ay, bx, by, avoid = 130, withSearchers = false) => {
         const p = nav.findPath(ax, ay, bx, by);
         if (!p.length) return Infinity;
         let len = 0, px = ax, py = ay;
@@ -117,7 +121,10 @@ await run(args._[0], async (page) => {
           // A sensible player does not run past an officer who is not already after him to get to cover.
           for (let f = 0; f <= 1; f += 0.1) {
             const x = px + (q.x - px) * f, y = py + (q.y - py) * f;
-            if (s.officers.some((k) => !k.chasing && !k.searching && Math.hypot(k.x - x, k.y - y) < avoid)) return Infinity;
+            if (s.officers.some((k) => (withSearchers || (!k.chasing && !k.searching)) && !k.chasing && Math.hypot(k.x - x, k.y - y) < avoid)) return Infinity;
+            // Walking to the crowd, he also keeps out of the view of officers who are not after him: a straight line to
+            // one within the range he is seen at (shorter in the dark) is a risk he does not take.
+            if (withSearchers && s.officers.some((k) => !k.chasing && Math.hypot(k.x - x, k.y - y) < k.data.visionRange * k.constructor.rangeFactorAt(x, y) * 1.05 && nav.clear(k.x, k.y, x, y))) return Infinity;
           }
           len += Math.hypot(q.x - px, q.y - py); px = q.x; py = q.y;
         }
@@ -132,6 +139,28 @@ await run(args._[0], async (page) => {
             if (!nav.isFree(x, y) || Math.hypot(x - s.player.x, y - s.player.y) < minAway || s.officers.some((k) => nav.clear(k.x, k.y, x, y))) continue;
             const len = pathLen(s.player.x, s.player.y, x, y);
             if (len < best) { best = len; found = { x, y }; }
+          }
+        }
+        return found;
+      };
+      // Dark pocket: the nearest unlit spot (searchers only notice a player in the dark within the close range) that no
+      // officer has a line of sight to, reached without crossing the view of an officer who is not after him.
+      const findDark = () => {
+        let best = Infinity, found = null;
+        for (let y = s.player.y - 420; y <= s.player.y + 420; y += 30) {
+          for (let x = 30; x <= L.width - 30; x += 30) {
+            if (!nav.isFree(x, y) || s.officers[0].constructor.rangeFactorAt(x, y) >= 1) continue;
+            if (s.officers.some((k) => Math.hypot(k.x - x, k.y - y) < 160 || (Math.hypot(k.x - x, k.y - y) < 260 && nav.clear(k.x, k.y, x, y)))) continue;
+            // Not near where he was seen (the chasers run there first, and the search starts there).
+            if (Math.hypot(x - s.chaseLastX, y - s.chaseLastY) < 100) continue;
+            // ...nor on the line he was running along: the chasers keep running that way for a while after losing sight of him.
+            const hx = s.chaseDirX, hy = s.chaseDirY;
+            if (hx || hy) {
+              const t = Math.max(0, Math.min(700, (x - s.chaseLastX) * hx + (y - s.chaseLastY) * hy));
+              if (Math.hypot(x - (s.chaseLastX + hx * t), y - (s.chaseLastY + hy * t)) < 70) continue;
+            }
+            const len = pathLen(s.player.x, s.player.y, x, y, 130, true);
+            if (len < best) { best = len; found = { x, y, len }; }
           }
         }
         return found;
@@ -182,7 +211,7 @@ await run(args._[0], async (page) => {
           for (let d = 0; d < len; d += 30) {
             const q = { x: a.x + ((b.x - a.x) * d) / len, y: a.y + ((b.y - a.y) * d) / len };
             const crowdEta = (along + d) / c.speed;
-            const pipEta = pathLen(s.player.x, s.player.y, q.x, q.y) / (s.tired ? 102 : 170);
+            const pipEta = pathLen(s.player.x, s.player.y, q.x, q.y, 130, true) / (s.tired ? 102 : s.carrying ? 144 : 170);
             if (Math.hypot(q.x - s.chaseLastX, q.y - s.chaseLastY) < 200) continue;
             if (pipEta + 0.3 <= crowdEta) return q;
             best = q;
@@ -201,13 +230,24 @@ await run(args._[0], async (page) => {
         else if (policy === 'flee') fleeStep(t);
         else if (policy === 'hold') s.joystick.vector.set(0, 0);
         else {
-          const c = s.crowds.find((k) => k.active && k.speed > 0);
-          // Until the chasers have lost him (a search has begun) he runs for the finish, round whatever corners the streets give him.
+          const c = s.crowds.filter((k) => k.active && k.speed > 0).sort((a, b) => Math.hypot(a.x - s.player.x, a.y - s.player.y) - Math.hypot(b.x - s.player.x, b.y - s.player.y))[0];
+          // Until the chasers have lost him (a search has begun) he flees like the smart runner, but a dark pocket he reaches
+          // well before any chaser (out of everyone's sight, off the way they run) is better than running on: he goes in and stands still.
           if (!lostThem && s.officers.some((k) => k.searching)) lostThem = true;
-          if (!lostThem) {
-            // Cover first; once there without having lost them, he does not stand about but runs on.
-            fleeStep(t); // flees like the smart runner until they have lost him
+          if (over.dark !== false && t - darkAt > 400) {
+            darkAt = t;
+            dark = findDark();
+            if (dark) {
+              const myEta = dark.len / (s.tired ? 102 : s.carrying ? 144 : 170);
+              const theirs = Math.min(Infinity, ...s.officers.filter((k) => k.chasing).map((k) => Math.hypot(k.x - dark.x, k.y - dark.y) / 184));
+              if (!lostThem && myEta + 0.2 > theirs) dark = null;
+            }
           }
+          const inPocket = dark && Math.hypot(dark.x - s.player.x, dark.y - s.player.y) <= 14;
+          if (dark && (lostThem ? (!c || dark.len < 700) : dark.len < 450)) {
+            if (!inPocket) goTo(t, dark.x, dark.y, dark.len < 120 ? 0.6 : 1); else s.joystick.vector.set(0, 0);
+          }
+          else if (!lostThem) fleeStep(t);
           else if (!c) s.joystick.vector.set(0, 0); // no crowd on the street just now: wait
           else if (Math.hypot(c.x - s.player.x, c.y - s.player.y) > 45) {
             if (t - meetAt > 500) { meet = meetPoint(c); meetAt = t; }
@@ -221,7 +261,7 @@ await run(args._[0], async (page) => {
           }
         }
         s.update(0, STEP);
-        if (trace && t % 480 === 0) lines.push(`  t=${t} pip ${Math.round(s.player.x)},${Math.round(s.player.y)} spd ${Math.round(s.playerSpeed)} st ${s.stamina.toFixed(2)}${s.tired ? "T" : ""} ${s.hidden ? 'HIDDEN' : ''}${lostThem ? ' lost-them' : ''} | ` + s.officers.map((k, i) => `${i}:${k.chasing ? 'C' : k.searching ? 'S' : k.alerted ? 'r' : '.'}@${Math.round(k.x)},${Math.round(k.y)} d${Math.round(Math.hypot(k.x - s.player.x, k.y - s.player.y))}`).join(' ') + ` crowd ${s.crowds[0].active ? Math.round(s.crowds[0].x) + ',' + Math.round(s.crowds[0].y) : '-'}`);
+        if (trace && t % 480 === 0) lines.push(`  t=${t} pip ${Math.round(s.player.x)},${Math.round(s.player.y)} spd ${Math.round(s.playerSpeed)} st ${s.stamina.toFixed(2)}${s.tired ? "T" : ""} ${s.hidden ? 'HIDDEN' : ''}${lostThem ? ' lost-them' : ''} pocket ${dark ? Math.round(dark.x) + ',' + Math.round(dark.y) + '/' + Math.round(dark.len) : '-'} | ` + s.officers.map((k, i) => `${i}:${k.chasing ? 'C' : k.searching ? 'S' : k.alerted ? 'r' : '.'}@${Math.round(k.x)},${Math.round(k.y)} d${Math.round(Math.hypot(k.x - s.player.x, k.y - s.player.y))}`).join(' ') + ` crowd ${s.crowds[0].active ? Math.round(s.crowds[0].x) + ',' + Math.round(s.crowds[0].y) : '-'}`);
         const chasers = s.officers.filter((k) => k.chasing).length;
         peakChasers = Math.max(peakChasers, chasers);
         if (trace && !shotSpot) { shotSpot = true; await snap('1-spotted'); }
@@ -274,6 +314,6 @@ await run(args._[0], async (page) => {
       if (caught.length) lines.push(`  caught at: ${caught.join(' ')}`);
     }
     return lines;
-  }, [spot, starts, every, !!args.hold, args.trace ?? null, { speed: args.speed, react: args.react, join: args.join, ahead: args.ahead, max: args.max, alert: args.alert, pursuit: args.pursuit, drain: args.drain, recover: args.recover, rest: args.rest, tired: args.tired, only: args.only, spread: args.spread, search: args.search, why: !!args.why }, args.difficulty ?? 'normal']);
+  }, [spot, starts, every, !!args.hold, args.trace ?? null, { speed: args.speed, react: args.react, join: args.join, ahead: args.ahead, max: args.max, alert: args.alert, pursuit: args.pursuit, drain: args.drain, recover: args.recover, rest: args.rest, tired: args.tired, only: args.only, case: !!args.case, dark: args.dark === 0 ? false : undefined, spread: args.spread, search: args.search, why: !!args.why }, args.difficulty ?? 'normal']);
   out.forEach((l) => console.log(l));
 });

@@ -4,7 +4,6 @@ import { NOIR_CONTRAST } from '../config';
 /** Most coloured zones, rings and lamps one pass can hold. Level 3 has six posters plus the start zone. */
 export const MAX_ZONES = 16;
 export const MAX_RINGS = 8;
-export const MAX_LAMPS = 8;
 
 /** The cold grade for gray ground: red down, blue up, blue lifted in the shadows (see `noirMatrix`). */
 const COLD = { r: 0.86, g: 0.97, b: 1.14, lift: 9 };
@@ -18,40 +17,43 @@ const FRAGMENT = [
   '#endif',
   'uniform sampler2D uMainSampler;',
   'uniform sampler2D uBeam;',
+  'uniform sampler2D uLamps;',
+  'uniform vec3 uLampBox;', // world width, world height, the view's top in the world
   'uniform vec2 uSize;',
   'uniform float uFlipY;',
   'uniform float uGray;',
   'uniform float uCover;',
   'uniform int uZoneN;',
   'uniform int uRingN;',
-  'uniform int uLampN;',
   `uniform vec4 uRect[${MAX_ZONES}];`,
   `uniform vec4 uCirc[${MAX_ZONES}];`,
   'uniform vec4 uAura;',
   `uniform vec4 uRing[${MAX_RINGS}];`,
   'uniform float uDark;',
   'uniform vec4 uPip;',
-  `uniform vec4 uLamp[${MAX_LAMPS}];`,
   'varying vec2 outTexCoord;',
   // Screen position in design pixels, y down.
   'float soft(vec2 p, vec4 c)',
   '{',
   '  if (c.w <= 0.0 || c.z <= 0.0) return 0.0;',
-  '  float d = distance(p, c.xy) / c.z;',
+  '  vec2 d = p - c.xy;',
+  '  float d2 = dot(d, d) / (c.z * c.z);',
   '  float a = 0.0;',
-  '  if (d < 0.75) a = 1.0 - (1.0 - 0.35 * c.w) * (1.0 - 0.35 * c.w) * (1.0 - 0.5 * c.w);',
-  '  else if (d < 0.88) a = 1.0 - (1.0 - 0.35 * c.w) * (1.0 - 0.35 * c.w);',
-  '  else if (d < 1.0) a = 0.35 * c.w;',
+  '  if (d2 < 0.5625) a = 1.0 - (1.0 - 0.35 * c.w) * (1.0 - 0.35 * c.w) * (1.0 - 0.5 * c.w);',
+  '  else if (d2 < 0.7744) a = 1.0 - (1.0 - 0.35 * c.w) * (1.0 - 0.35 * c.w);',
+  '  else if (d2 < 1.0) a = 0.35 * c.w;',
   '  return a;',
   '}',
+  // Squared distances throughout: no square root per lamp per pixel.
   'float hole(vec2 p, vec4 c)',
   '{',
-  '  if (c.z <= 0.0) return 1.0;',
-  '  float d = distance(p, c.xy) / c.z;',
-  '  if (d < 0.68) return 0.25025;',
-  '  if (d < 0.85) return 0.3575;',
-  '  if (d < 1.0) return 0.55;',
-  '  return 1.0;',
+  '  vec2 d = p - c.xy;',
+  '  float d2 = dot(d, d);',
+  '  float r2 = c.z * c.z;',
+  '  if (d2 >= r2) return 1.0;',
+  '  if (d2 < 0.4624 * r2) return 0.25025;',
+  '  if (d2 < 0.7225 * r2) return 0.3575;',
+  '  return 0.55;',
   '}',
   'void main ()',
   '{',
@@ -90,11 +92,8 @@ const FRAGMENT = [
   '  if (uDark > 0.0)',
   '  {',
   '    float rem = hole(p, uPip);',
-  `    for (int i = 0; i < ${MAX_LAMPS}; i++)`,
-  '    {',
-  '      if (i >= uLampN) break;',
-  '      rem *= hole(p, uLamp[i]);',
-  '    }',
+  // The lamps' pools never move, so their darkness is one texture painted once in world space.
+  '    rem *= texture2D(uLamps, vec2(p.x / uLampBox.x, 1.0 - (p.y + uLampBox.z) / uLampBox.y)).r;',
   '    float b = texture2D(uBeam, vec2(outTexCoord.x, mix(outTexCoord.y, 1.0 - outTexCoord.y, uFlipY))).a;',
   '    rem *= 1.0 - b;',
   '    rgb = mix(rgb, vec3(0.0196, 0.0275, 0.0588), uDark * rem);',
@@ -118,8 +117,9 @@ export interface GradeState {
   ring: Float32Array;
   dark: number;
   pip: [number, number, number, number];
-  lampN: number;
-  lamp: Float32Array;
+  /** The lamp pools' darkness in world space (alpha = how much darkness is left), and the level size and view top it is read with. */
+  lamps: Phaser.Textures.Texture;
+  lampBox: [number, number, number];
   beam: Phaser.Textures.DynamicTexture;
 }
 
@@ -137,6 +137,7 @@ function register(renderer: Phaser.Renderer.WebGL.WebGLRenderer): void {
     },
     setupTextures: function (controller: { state: GradeState }, textures: unknown[]) {
       textures[1] = controller.state.beam.get().glTexture;
+      textures[2] = controller.state.lamps.get().glTexture;
     },
     setupUniforms: function (this: { programManager: { setUniform: (n: string, v: unknown) => void } }, controller: { state: GradeState; flipY: number }) {
       const s = controller.state;
@@ -154,8 +155,8 @@ function register(renderer: Phaser.Renderer.WebGL.WebGLRenderer): void {
       u('uRing[0]', s.ring);
       u('uDark', s.dark);
       u('uPip', s.pip);
-      u('uLampN', s.lampN);
-      u('uLamp[0]', s.lamp);
+      u('uLamps', 2);
+      u('uLampBox', s.lampBox);
     },
   });
   nodes.addNodeConstructor(NODE, Node);

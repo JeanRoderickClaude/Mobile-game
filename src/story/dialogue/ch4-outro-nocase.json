@@ -1,0 +1,72 @@
+{
+ "stage": "harbor",
+ "tone": "color",
+ "cast": [
+  {
+   "id": "pip",
+   "x": 120
+  },
+  {
+   "id": "jonas",
+   "x": 340,
+   "offstage": true
+  }
+ ],
+ "lines": [
+  {
+   "text": "Old Jonas lives in an upturned boat on the quay: a stove, a lamp, and a smell of tar and warm bread."
+  },
+  {
+   "text": "Pip stands dripping on the floor, out of breath and empty-handed. He keeps looking at his hands, as if the case might turn up in them."
+  },
+  {
+   "speaker": "jonas",
+   "text": "You must be the trumpeter. I heard the whistles from here. Sit down before you fall down.",
+   "enter": [
+    "jonas"
+   ]
+  },
+  {
+   "speaker": "pip",
+   "text": "Um. Ruby said to find you. She said to bring her case, and I left it. I'm sorry. There were whistles."
+  },
+  {
+   "speaker": "jonas",
+   "text": "Whistles will do that to a person."
+  },
+  {
+   "text": "Jonas puts a chipped mug of something hot in Pip's hands, and for a while neither of them says anything."
+  },
+  {
+   "speaker": "jonas",
+   "text": "Ruby didn't get out, kid. The Squad took her, and the Cellar with her. The chairs, the piano, the stage."
+  },
+  {
+   "speaker": "pip",
+   "text": "(She told me to go. I went. It was the plan, and it was a good plan. Why does it feel like the worst one?)"
+  },
+  {
+   "speaker": "jonas",
+   "text": "You ran so there would still be someone to run to. That counts for something. It has to."
+  },
+  {
+   "speaker": "jonas",
+   "text": "Whoever signs these orders wants this town quiet. I would like to know why."
+  },
+  {
+   "speaker": "pip",
+   "text": "Me too. Um. What do we do now?"
+  },
+  {
+   "speaker": "jonas",
+   "text": "We find the ones who are still loud. There's a drummer boy down by the docks. Teun. Loudest kid in Port Murmur, and he can't hide to save his life."
+  },
+  {
+   "speaker": "pip",
+   "text": "(I can't hide either. Maybe two bad hiders add up to one decent one.)"
+  },
+  {
+   "text": "Outside, the rain keeps falling. Somewhere along the docks a drum starts up, very softly, and then not so softly."
+  }
+ ]
+}
