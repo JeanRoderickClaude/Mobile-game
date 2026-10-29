@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import {
   GAME_HEIGHT, GAME_WIDTH, NOIR_AURA_GROW_MS, NOIR_AURA_FACTOR, NOIR_AURA_FADE_MS, NOIR_CONTRAST, NOIR_SPREAD_MS } from '../config';
 import type { LightData, NoirZone, Rect } from '../levels/types';
-import { addGradeFilter, MAX_LAMPS, MAX_RINGS, MAX_ZONES, type GradeState } from './gradeFilter';
+import { addGradeFilter, MAX_RINGS, MAX_ZONES, type GradeState } from './gradeFilter';
 import type { PoliceOfficer } from '../entities/PoliceOfficer';
 
 interface Zone extends NoirZone {
@@ -15,6 +15,7 @@ interface Zone extends NoirZone {
   spread: number;
 }
 
+const LAMP_SCALE = 0.5; // the lamp texture is half the level's size, like the beam texture
 const BEAM_SCALE = 0.5; // the flashlight beam texture is half the screen size; the beams are soft anyway
 
 /** Night settings handed to the grade: the lamps, how dark, and Pip's light radius. */
@@ -22,6 +23,9 @@ export interface NightSetup {
   lamps: LightData[];
   darkness: number;
   pipRadius: number;
+  /** The level's size, for the lamp texture. */
+  width: number;
+  height: number;
 }
 
 /**
@@ -75,12 +79,49 @@ export class Noir {
       ring: new Float32Array(MAX_RINGS * 4),
       dark: 0,
       pip: [0, 0, 0, 0],
-      lampN: 0,
-      lamp: new Float32Array(MAX_LAMPS * 4),
+      lamps: this.paintLamps(scene),
+      lampBox: [this.night?.width ?? 1, this.night?.height ?? 1, 0],
       beam: this.beamTex,
     };
     this.layer.enableFilters();
     addGradeFilter(this.layer, this.state, FLIP_Y);
+  }
+
+  /**
+   * The lamp pools' darkness, computed once in world space at half size (the pools never move): each texel holds in its red
+   * channel how much darkness is left there (0.55, 0.36 or 0.25 inside a pool's three rings, 1 outside), so the shader reads
+   * one texel instead of testing every lamp. Without night, a 1 px stand-in.
+   */
+  private paintLamps(scene: Phaser.Scene): Phaser.Textures.CanvasTexture {
+    const KEY = 'night-lamps';
+    if (scene.textures.exists(KEY)) scene.textures.remove(KEY);
+    const night = this.night;
+    const S = LAMP_SCALE;
+    const w = night ? Math.ceil(night.width * S) : 1;
+    const h = night ? Math.ceil(night.height * S) : 1;
+    const tex = scene.textures.createCanvas(KEY, w, h)!;
+    const ctx = tex.getContext();
+    const img = ctx.createImageData(w, h);
+    const data = img.data;
+    data.fill(255);
+    for (const l of night?.lamps ?? []) {
+      const r = l.radius * S;
+      const x0 = Math.max(0, Math.floor(l.x * S - r)), x1 = Math.min(w - 1, Math.ceil(l.x * S + r));
+      const y0 = Math.max(0, Math.floor(l.y * S - r)), y1 = Math.min(h - 1, Math.ceil(l.y * S + r));
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const d = Math.hypot(x + 0.5 - l.x * S, y + 0.5 - l.y * S) / r;
+          const rem = d < 0.68 ? 0.25025 : d < 0.85 ? 0.3575 : d < 1 ? 0.55 : 1;
+          const i = (y * w + x) * 4;
+          const v = Math.round(data[i] * rem); // pools that overlap multiply, like erasing twice
+          data[i] = data[i + 1] = data[i + 2] = v;
+        }
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    tex.refresh();
+    tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    return tex;
   }
 
   /** Moves objects into the filtered layer, keeping their depth order. */
@@ -164,13 +205,7 @@ export class Noir {
     if (night) {
       st.dark = night.darkness;
       st.pip = [pipX - view.x, pipY - view.y, night.pipRadius, 0];
-      let li = 0;
-      for (const l of night.lamps) {
-        if (l.y + l.radius < view.y || l.y - l.radius > view.y + view.height || li >= MAX_LAMPS) continue;
-        st.lamp.set([l.x - view.x, l.y - view.y, l.radius, 0], li * 4);
-        li++;
-      }
-      st.lampN = li;
+      st.lampBox[2] = view.y;
       this.drawBeams(view, officers);
     }
   }

@@ -2,10 +2,12 @@ import Phaser from 'phaser';
 import {
   ASSIST_ANGLE_DEG, ASSIST_BREAK_STRENGTH, ASSIST_FLOOR_FACTOR, ASSIST_PACE_MAX, ASSIST_PACE_MIN, ASSIST_SETTLE_DIST, CHARACTER_SCALE, COIN_PICKUP_RADIUS, DIFFICULTIES, type Difficulty, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
   NOISE_WALK_FACTOR, OFFICER_RADIUS, POSTER_ZONE, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, RING_INTERVAL_MS, RING_LIFE_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
+  CASE_DRAIN_FACTOR, CASE_REACH, CASE_SPEED_FACTOR,
 } from '../config';
 import { Bystanders } from '../entities/Bystanders';
 import { Character } from '../entities/Character';
 import { Coin } from '../entities/Coin';
+import { drawCase, makeCaseImage } from '../entities/CaseItem';
 import { Crowd } from '../entities/Crowd';
 import { PoliceOfficer } from '../entities/PoliceOfficer';
 import { LEVELS } from '../levels';
@@ -50,7 +52,7 @@ export class GameScene extends Phaser.Scene {
   private coinLabel!: CoinLabel;
   private blockers: Rect[] = [];
   private joystick!: VirtualJoystick;
-  private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift' | 'space' | 'x', Phaser.Input.Keyboard.Key>;
+  private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift' | 'space' | 'x' | 'e', Phaser.Input.Keyboard.Key>;
   private bystanders!: Bystanders;
   /** Trumpet: playing this frame, the noise meter (0..1) and the sound rings in flight. */
   private playing = false;
@@ -64,6 +66,16 @@ export class GameScene extends Phaser.Scene {
   private ringsDrawn = false;
   private trumpetPointer: number | null = null; // touch on the on-screen trumpet button
   private trumpetButton: Phaser.GameObjects.Container | null = null;
+  /** Ruby's case (chapter 4): carried or lying where it was dropped, the ground and carried images, and what the action button does now. */
+  private carrying = false;
+  private caseX = 0;
+  private caseY = 0;
+  private caseGround: Phaser.GameObjects.Image | null = null;
+  private caseCarried: Phaser.GameObjects.Image | null = null;
+  private caseMode: 'pick' | 'drop' | null = null;
+  private caseHint: Phaser.GameObjects.Text | null = null;
+  private buttonTrumpet: Phaser.GameObjects.Graphics | null = null;
+  private buttonCase: Phaser.GameObjects.Container | null = null;
   /** Set by the balance tools to play without a key or touch. */
   trumpetOverride = false;
   /** Chase levels: where the chasing officers last saw Pip, and for how long none has. */
@@ -135,6 +147,9 @@ export class GameScene extends Phaser.Scene {
     this.rings = [];
     this.trumpetPointer = null;
     this.trumpetButton = null;
+    this.carrying = false;
+    this.caseGround = this.caseCarried = this.caseHint = this.buttonTrumpet = this.buttonCase = null;
+    this.caseMode = null;
     this.trumpetOverride = false;
     this.noir = null;
     this.atmosphere = null;
@@ -188,6 +203,7 @@ export class GameScene extends Phaser.Scene {
     if (this.level.night) this.player.setImageTint(0xcdcdcd);
     this.cameras.main.startFollow(this.player, true, 1, 0.15);
 
+    if (this.level.instrumentCase) this.buildCase();
     this.meter = new Bar(this, 40);
     this.staminaBar = new Bar(this, 40);
     this.hiddenIcon = this.buildHiddenIcon();
@@ -195,7 +211,7 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard!;
     const K = Phaser.Input.Keyboard.KeyCodes;
     this.keys = kb.addKeys({
-      up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D, shift: K.SHIFT, space: K.SPACE, x: K.X,
+      up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D, shift: K.SHIFT, space: K.SPACE, x: K.X, e: K.E,
     }) as typeof this.keys;
     if (this.level.trumpet && this.sys.game.device.input.touch) this.buildTrumpetButton();
     this.joystick = new VirtualJoystick(this, (p) => this.onTrumpetButton(p));
@@ -249,7 +265,7 @@ export class GameScene extends Phaser.Scene {
       const keep = new Set<Phaser.GameObjects.GameObject>([this.player, ...this.meter.objects, ...this.staminaBar.objects, this.hiddenIcon, ...this.spots.overlay]);
       const world = this.children.list.filter((o) => !keep.has(o) && (o as unknown as { scrollFactorX?: number }).scrollFactorX !== 0);
       const cfg = DIFFICULTIES[this.difficulty];
-      const night = this.level.night ? { lamps: this.level.night.lights, darkness: cfg.darkness, pipRadius: cfg.pipLightRadius } : null;
+      const night = this.level.night ? { lamps: this.level.night.lights, darkness: cfg.darkness, pipRadius: cfg.pipLightRadius, width: this.level.width, height: this.level.height } : null;
       this.noir = new Noir(this, this.level.noir?.zones ?? [], night, !!this.level.noir);
       this.noir.adopt(world);
       this.noir.layer.setDepth(29);
@@ -263,6 +279,7 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(delta, 50);
     this.elapsedMs += dt;
 
+    this.updateCase();
     this.updateTrumpet(dt);
     this.movePlayer(dt);
     this.collectCoins();
@@ -317,6 +334,10 @@ export class GameScene extends Phaser.Scene {
       dx *= TRUMPET_SPEED_FACTOR;
       dy *= TRUMPET_SPEED_FACTOR;
     }
+    // Carrying Ruby's case lowers Pip's top speed to a fraction (the crowd assist below still works on the real speed).
+    const load = this.carrying ? CASE_SPEED_FACTOR : 1;
+    dx *= load;
+    dy *= load;
     const wanted = Math.hypot(dx, dy) * PLAYER_SPEED;
     const cap = sprint ? Infinity : this.assistCap(dx, dy);
     this.assisting = wanted > cap;
@@ -328,13 +349,14 @@ export class GameScene extends Phaser.Scene {
       // Stamina: running faster than crowd pace drains it; empty, Pip is capped near crowd pace until it recovers.
       const sc = DIFFICULTIES[this.difficulty];
       let speed = Math.hypot(dx, dy) * PLAYER_SPEED;
-      const tiredCap = PLAYER_SPEED * sc.staminaTiredFactor;
+      const tiredCap = PLAYER_SPEED * sc.staminaTiredFactor * load;
       if (this.tired && speed > tiredCap) {
         dx *= tiredCap / speed;
         dy *= tiredCap / speed;
         speed = tiredCap;
       }
-      this.updateStamina(dt, speed);
+      // Stamina is spent on the effort Pip makes, not on the slower speed the load leaves him.
+      this.updateStamina(dt, speed / load);
     }
     this.assistHint.setText(this.assisting ? (keyboard ? 'Hold X to break cover' : 'Push to the edge to break cover') : '');
 
@@ -395,7 +417,7 @@ export class GameScene extends Phaser.Scene {
     const cfg = DIFFICULTIES[this.difficulty];
     const pace = PLAYER_SPEED * WALK_FACTOR;
     if (speed > pace * 1.02) {
-      this.stamina -= ((speed - pace) / (PLAYER_SPEED - pace)) * (dt / 1000) / cfg.staminaDrainSec;
+      this.stamina -= ((speed - pace) / (PLAYER_SPEED - pace)) * (dt / 1000) / cfg.staminaDrainSec * (this.carrying ? CASE_DRAIN_FACTOR : 1);
     } else {
       const rest = this.hidden || (!!this.level.night && PoliceOfficer.rangeFactorAt(this.player.x, this.player.y) < 1);
       this.stamina += (dt / 1000) * (rest ? cfg.staminaRestFactor : 1) / cfg.staminaRecoverSec;
@@ -643,7 +665,7 @@ export class GameScene extends Phaser.Scene {
   private updateTrumpet(dt: number): void {
     if (!this.level.trumpet) return;
     const cfg = DIFFICULTIES[this.difficulty];
-    this.playing = this.trumpetOverride || this.keys.space.isDown || this.trumpetPointer !== null;
+    this.playing = !this.carrying && (this.trumpetOverride || this.keys.space.isDown || this.trumpetPointer !== null);
     this.noise = Phaser.Math.Clamp(this.noise + (dt / 1000) * (this.playing ? cfg.noiseRisePerSec : -cfg.noiseFallPerSec), 0, 1);
     if (this.noise >= 1) {
       // Too loud: officers within hearing come to look where Pip is now, walking round buildings on the navigation grid.
@@ -722,15 +744,26 @@ export class GameScene extends Phaser.Scene {
 
   /** Round trumpet button, bottom right, opposite the joystick. Held to play. */
   private buildTrumpetButton(): void {
-    const g = this.add.graphics();
-    g.fillStyle(0x1d1f2b, 0.55).fillCircle(0, 0, 54);
-    g.lineStyle(3, 0xffd23f, 0.9).strokeCircle(0, 0, 54);
+    const ring = this.add.graphics();
+    ring.fillStyle(0x1d1f2b, 0.55).fillCircle(0, 0, 54);
+    ring.lineStyle(3, 0xffd23f, 0.9).strokeCircle(0, 0, 54);
     // A small trumpet: mouthpiece, tube, valves and bell.
+    const g = this.add.graphics();
     g.fillStyle(0xffd23f, 1);
     g.fillRect(-30, -4, 44, 8).fillRect(-36, -6, 6, 12);
     g.fillRect(-12, -14, 5, 10).fillRect(-3, -14, 5, 10).fillRect(6, -14, 5, 10);
     g.fillTriangle(12, -4, 12, 4, 32, 0).fillTriangle(14, 0, 34, -16, 34, 16);
-    this.trumpetButton = this.add.container(GAME_WIDTH - 78, GAME_HEIGHT - 92, [g]).setScrollFactor(0).setDepth(95);
+    this.buttonTrumpet = g;
+    const parts: Phaser.GameObjects.GameObject[] = [ring, g];
+    if (this.level.instrumentCase) {
+      // The same button picks up and drops the case: its icon and a word replace the trumpet while that is what a press does.
+      const icon = this.add.graphics().setScale(1.5).setPosition(0, -10);
+      drawCase(icon);
+      const word = this.add.text(0, 24, '', { fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '15px', color: '#ffd23f', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5);
+      this.buttonCase = this.add.container(0, 0, [icon, word]).setVisible(false);
+      parts.push(this.buttonCase);
+    }
+    this.trumpetButton = this.add.container(GAME_WIDTH - 78, GAME_HEIGHT - 92, parts).setScrollFactor(0).setDepth(95);
     const release = (p: Phaser.Input.Pointer) => p.id === this.trumpetPointer && this.releaseTrumpet();
     this.input.on('pointerup', release);
     this.input.on('pointerupoutside', release);
@@ -744,6 +777,10 @@ export class GameScene extends Phaser.Scene {
   private onTrumpetButton(p: Phaser.Input.Pointer): boolean {
     const b = this.trumpetButton;
     if (!b || this.trumpetPointer !== null || Math.hypot(p.x - b.x, p.y - b.y) > 58) return false;
+    if (this.caseMode) {
+      this.toggleCase();
+      return true;
+    }
     this.trumpetPointer = p.id;
     b.setScale(0.92);
     return true;
@@ -752,6 +789,59 @@ export class GameScene extends Phaser.Scene {
   private releaseTrumpet(): void {
     this.trumpetPointer = null;
     this.trumpetButton?.setScale(1);
+  }
+
+  /** Ruby's case: the image on the ground, the one Pip carries, and the hint. */
+  private buildCase(): void {
+    const c = this.level.instrumentCase!;
+    this.caseX = c.x;
+    this.caseY = c.y;
+    this.caseGround = makeCaseImage(this, c.x, c.y).setDepth(8);
+    this.caseCarried = makeCaseImage(this, 19, 2).setRotation(Math.PI / 2).setVisible(false);
+    if (this.level.night) this.caseCarried.setTint(0xcdcdcd);
+    this.player.add(this.caseCarried);
+    this.caseHint = this.add
+      .text(GAME_WIDTH / 2, 890, '', { fontFamily: 'Arial, sans-serif', fontSize: '20px', color: '#ffd23f', stroke: '#000', strokeThickness: 4 })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(90);
+  }
+
+  /** Picks the case up or puts it down, wherever Pip stands. Also used by the balance tools. */
+  setCarrying(value: boolean): void {
+    if (!this.caseGround || value === this.carrying) return;
+    this.carrying = value;
+    if (value) {
+      this.caseGround.setVisible(false);
+    } else {
+      this.caseX = this.player.x;
+      this.caseY = this.player.y;
+      this.caseGround.setPosition(this.caseX, this.caseY).setVisible(true);
+    }
+    this.caseCarried!.setVisible(value);
+  }
+
+  private toggleCase(): void {
+    if (this.carrying) this.setCarrying(false);
+    else if (Math.hypot(this.caseX - this.player.x, this.caseY - this.player.y) <= CASE_REACH) this.setCarrying(true);
+  }
+
+  /** Key and button handling for the case, and what the button shows. */
+  private updateCase(): void {
+    if (!this.caseGround) return;
+    const J = Phaser.Input.Keyboard.JustDown;
+    if (J(this.keys.e) || (this.carrying && J(this.keys.space))) this.toggleCase();
+    const near = !this.carrying && Math.hypot(this.caseX - this.player.x, this.caseY - this.player.y) <= CASE_REACH;
+    const mode = this.carrying ? 'drop' : near ? 'pick' : null;
+    if (mode === this.caseMode) return;
+    this.caseMode = mode;
+    const touch = !!this.trumpetButton;
+    this.caseHint!.setText(mode === 'pick' ? (touch ? 'Tap the button to pick up the case' : 'Press E to pick up the case') : mode === 'drop' ? (touch ? 'Tap the button to drop the case' : 'Press E or Space to drop the case') : '');
+    if (this.buttonCase) {
+      this.buttonCase.setVisible(mode !== null);
+      (this.buttonCase.list[1] as Phaser.GameObjects.Text).setText(mode === 'pick' ? 'PICK UP' : 'DROP');
+      this.buttonTrumpet!.setVisible(mode === null);
+    }
   }
 
   private end(outcome: ResultData['outcome']): void {
@@ -766,6 +856,8 @@ export class GameScene extends Phaser.Scene {
       // Tag choices count only on finishing: each tag's flag is true when it was done this run, false when not.
       const tags = this.level.tags ?? [];
       if (tags.length) setFlags(Object.fromEntries(tags.map((t) => [t.flag, this.spots.tagged(t.flag)])));
+      // Ruby's case counts only on finishing: true when Pip carries it across the line.
+      if (this.level.instrumentCase) setFlags({ [this.level.instrumentCase.flag]: this.carrying });
     }
     const data: ResultData = {
       outcome,

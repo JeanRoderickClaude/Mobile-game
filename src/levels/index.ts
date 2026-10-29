@@ -80,6 +80,11 @@ function validate(level: LevelData, path: string): LevelData {
     if (!isPoint(t) || !t.label || !t.flag) fail(`tag ${i} needs "x", "y", "label" and "flag"`);
     if (!(Number.isInteger(t.coins) && t.coins >= 0) || !(t.ms > 0)) fail(`tag ${i} needs whole "coins" (0 or more) and positive "ms"`);
   });
+  if (level.instrumentCase !== undefined) {
+    const c = level.instrumentCase;
+    if (!c || !isPoint(c) || !c.flag) fail('"instrumentCase" needs "x", "y" and "flag"');
+    if (!level.trumpet) fail('"instrumentCase" uses the trumpet button; set "trumpet": true');
+  }
   if (level.chaseMode !== undefined && typeof level.chaseMode !== 'boolean') fail('"chaseMode" must be true or false');
   if (level.neon !== undefined) {
     if (!Array.isArray(level.neon)) fail('"neon" must be an array');

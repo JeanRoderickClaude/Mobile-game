@@ -46,7 +46,10 @@ export async function run(levelFile, fn) {
   // --difficulty easy|normal (default normal) picks the catch time and cone length.
   const difficulty = parseArgs().difficulty ?? 'normal';
   if (!['easy', 'normal'].includes(difficulty)) throw new Error('--difficulty must be easy or normal');
-  console.log(`Difficulty: ${difficulty}`);
+  // --flags a,b starts the level with those story flags true (for example --flags vanTagged).
+  const flagArg = parseArgs().flags;
+  const flags = flagArg ? Object.fromEntries(String(flagArg).split(',').map((f) => [f, true])) : undefined;
+  console.log(`Difficulty: ${difficulty}${flags ? ', flags ' + Object.keys(flags).join(',') : ''}`);
   const server = await createServer({ root, logLevel: 'error', server: { port: 5199, strictPort: false, host: '127.0.0.1' } });
   await server.listen();
   const url = server.resolvedUrls.local[0];
@@ -58,20 +61,20 @@ export async function run(levelFile, fn) {
     await page.goto(url);
     // The game opens on the menu; start the level scene directly.
     await page.waitForFunction(() => window.game?.scene.getScene('menu')?.sys.isActive());
-    await page.evaluate(([levelIndex, difficulty]) => window.game.scene.getScene('menu').scene.start('game', { levelIndex, difficulty }), [index, difficulty]);
+    await page.evaluate(([levelIndex, difficulty, flags]) => window.game.scene.getScene('menu').scene.start('game', { levelIndex, difficulty, flags }), [index, difficulty, flags]);
     await page.waitForFunction(() => window.game?.scene.getScene('game')?.player);
-    await page.evaluate(([levelIndex, difficulty]) => {
+    await page.evaluate(([levelIndex, difficulty, flags]) => {
       window.__restart = async () => {
         const s = window.game.scene.getScene('game');
         const old = s.player;
-        s.scene.restart({ levelIndex, difficulty });
+        s.scene.restart({ levelIndex, difficulty, flags });
         // create() has run once a new player object exists.
         while (s.player === old || !s.sys.isActive()) await new Promise((r) => setTimeout(r, 10));
         s.scene.pause();
         window.__scene = s;
         return s;
       };
-    }, [index, difficulty]);
+    }, [index, difficulty, flags]);
     await page.evaluate(() => window.__restart());
     await fn(page);
     if (errors.length) console.log('Page errors:', errors);
