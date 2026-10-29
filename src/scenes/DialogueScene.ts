@@ -3,6 +3,7 @@ import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { noirMatrix } from '../systems/noir';
 import { Character } from '../entities/Character';
 import { matches } from '../story/flags';
+import { backdropKey, backdropUrl } from '../story/backdrops';
 import { CAST, DIALOGUES, PLAYER_CAST_ID, castLook, type DialogueLine, type StageName, type Tone } from '../story/story';
 import { equippedLook, getFlags, setFlags } from '../systems/save';
 import { FONT, FONT_BOLD, makeButton, type Button } from '../ui/widgets';
@@ -35,6 +36,7 @@ const STEP_FORWARD = 16; // the speaker moves this far down (toward the viewer).
 const STEP_SCALE = 1.07; // ...and grows by this much
 const DIM = 0.42; // brightness of everyone who is not speaking
 const MOVE_MS = 450; // walking on or off
+const SHADE_MAX = 0.5; // darkest point of the gradient at the foot of a painted backdrop
 
 // The box keeps one height per scene, sized to its longest line, so it does
 // not jump between lines. Text is 26px and wraps across the full box width:
@@ -78,8 +80,20 @@ export class DialogueScene extends Phaser.Scene {
   private toneMatrix: Phaser.Display.ColorMatrix | null = null;
   private grayness = { value: 0 };
 
+  private stage: StageName | null = null;
+
   constructor() {
     super('dialogue');
+  }
+
+  init(data: DialogueSceneData): void {
+    this.stage = DIALOGUES[data.dialogueId]?.stage ?? null;
+  }
+
+  /** Loads the stage's painted backdrop if it is not loaded yet; if the file is missing the drawn backdrop is used. */
+  preload(): void {
+    if (!this.stage || this.textures.exists(backdropKey(this.stage))) return;
+    this.load.image(backdropKey(this.stage), backdropUrl(this.stage));
   }
 
   create(data: DialogueSceneData): void {
@@ -100,7 +114,7 @@ export class DialogueScene extends Phaser.Scene {
     bg.setInteractive();
     bg.on('pointerdown', () => (this.pressed = true));
     bg.on('pointerup', () => this.pressed && this.advance());
-    const backdrop = drawStage(this, dialogue.stage);
+    const backdrop = this.textures.exists(backdropKey(dialogue.stage)) ? paintedStage(this, dialogue.stage) : drawStage(this, dialogue.stage);
     this.toneMatrix = null;
     if (this.game.renderer.type === Phaser.WEBGL) {
       backdrop.enableFilters();
@@ -311,6 +325,23 @@ export class DialogueScene extends Phaser.Scene {
 /** Where a character walks on from and off to: the nearer side of the screen. */
 function offstageX(x: number): number {
   return x < GAME_WIDTH / 2 ? -90 : GAME_WIDTH + 90;
+}
+
+/**
+ * A painted backdrop: the image fills the stage strip, and a gradient darkens its bottom so the characters
+ * (feet on FLOOR_Y) stand clearly against bright floors and reflections. In one container, like the drawn
+ * backdrops, so the tone filter grays both the same way.
+ */
+function paintedStage(scene: Phaser.Scene, stage: StageName): Phaser.GameObjects.Container {
+  const image = scene.add.image(0, 0, backdropKey(stage)).setOrigin(0).setDisplaySize(GAME_WIDTH, STAGE_H);
+  const shade = scene.add.graphics();
+  const from = 200;
+  const steps = 28;
+  for (let i = 0; i < steps; i++) {
+    const t = (i + 1) / steps;
+    shade.fillStyle(0x05060c, SHADE_MAX * t * t).fillRect(0, from + ((STAGE_H - from) * i) / steps, GAME_WIDTH, (STAGE_H - from) / steps + 1);
+  }
+  return scene.add.container(0, 0, [image, shade]);
 }
 
 /** Flat silhouette backdrops for the stage, filling y 0..STAGE_H, in one container so they can be grayed. */

@@ -6,6 +6,7 @@ import { GameScene } from './scenes/GameScene';
 import { LockerScene } from './scenes/LockerScene';
 import { MenuScene } from './scenes/MenuScene';
 import { ResultScene } from './scenes/ResultScene';
+import { warmBackdrops } from './story/backdrops';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -22,6 +23,8 @@ const game = new Phaser.Game({
   // The first scene in the list starts on load.
   scene: [MenuScene, GameScene, ResultScene, LockerScene, ChapterMapScene, DialogueScene],
 });
+
+warmBackdrops();
 
 // Exposed in development only, for browser-console debugging and automated tests.
 if (import.meta.env.DEV) (window as unknown as { game: Phaser.Game }).game = game;

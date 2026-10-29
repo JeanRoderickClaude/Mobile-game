@@ -80,6 +80,8 @@ Controlled places look controlled. Corporate and Quiet Squad ground is drawn in 
 
 In levels, gray ground is a grayscale copy of the level with extra contrast. While Pip plays the trumpet, color spreads outward from him with the sound rings and fades when he stops. Each level marks zones that start gray or colored; a gray zone that allows it turns colored for the rest of the run once enough music has been played inside it. Pip and everything he wears are always in full color, so the player can always find him. Colored zones mark places that belong to the music: Pip's busking corner, the Brass Cellar's door.
 
+Painted backdrops live in `public/backdrops/` (see its README). Chapters 1 to 3 use street, harbor, cellar and night-street. velvet-heights.webp (chapter 7, Drone's office district) and city-hall.webp (chapter 8, the march's end) are already in the folder and wait for those chapters' dialogue stages.
+
 In dialogue, the backdrop takes the scene's tone: gray for the Quiet Squad's streets and anything belonging to Drone and Partners, color for the Brass Cellar and other music places. Characters stay in color. A line can switch the tone, for example when the Squad arrives and the street goes gray, or when music returns. Use these switches for story beats, not decoration.
 
 At night the screen is dark outside a small circle around Pip, the lamps' pools and the flashlight beams, so the player always reads where the light is. Light is danger: under a lamp Pip is seen from far away. Darkness sits on top of the noir look, so night streets are gray and dark, and a planted poster colors its wall.
