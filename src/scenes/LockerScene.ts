@@ -20,6 +20,7 @@ interface Tile {
   entry: Entry;
   frame: Phaser.GameObjects.Rectangle;
   status: Phaser.GameObjects.Text;
+  mini: Character;
 }
 
 const TILE_W = 124;
@@ -105,11 +106,12 @@ export class LockerScene extends Phaser.Scene {
       // Mini character wearing just this item on top of the default look.
       // Hair colour tiles go bare-headed, so the hair shows from above.
       const look: PlayerLook = { ...DEFAULT_LOOK, [LOOK_KEY[category]]: entry.id, ...(category === 'haircolor' ? { hat: 'none' } : {}) };
-      const mini = new Character(this, x, y - 12 + (category === 'sign' ? 14 : 0), look).setScale(category === 'sign' ? 1.6 : 2);
+      // Front view, like the large preview, so a tile shows exactly what the preview will show.
+      const mini = new Character(this, x, y + 27, look, { view: 'front' }).setScale(0.95);
       const name = this.add.text(x, y + 38, entry.name, { fontFamily: FONT, fontSize: '15px', color: '#ffffff' }).setOrigin(0.5);
       const status = this.add.text(x, y + 60, '', { fontFamily: FONT_BOLD, fontSize: '14px', color: '#ffffff' }).setOrigin(0.5);
       this.grid.push(frame, mini, name, status);
-      this.tiles.push({ entry, frame, status });
+      this.tiles.push({ entry, frame, status, mini });
     });
     this.select(equippedId(category));
   }
