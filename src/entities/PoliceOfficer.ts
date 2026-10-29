@@ -51,8 +51,10 @@ export class PoliceOfficer {
   y: number;
   facing: number;
 
-  private sprite: Phaser.GameObjects.Container;
+  private sprite: Phaser.GameObjects.Image;
   private cone: Phaser.GameObjects.Graphics;
+  /** What the cone was last drawn for; it is only redrawn when one of these changes. */
+  private coneKey = '';
   private target = 1;
   private direction = 1; // +1 forward, -1 backward (pingpong only)
   private pauseLeft = 0;
@@ -400,6 +402,9 @@ export class PoliceOfficer {
 
   /** Draw the cone clipped by obstacles. alert (0..1) tints it toward red. */
   drawCone(blockers: Rect[], alert: number): void {
+    const key = `${this.x.toFixed(2)}|${this.y.toFixed(2)}|${this.facing.toFixed(4)}|${alert.toFixed(2)}|${PoliceOfficer.sight.night ? 1 : 0}`;
+    if (key === this.coneKey) return;
+    this.coneKey = key;
     const g = this.cone;
     g.clear();
     const color = Phaser.Display.Color.Interpolate.ColorWithColor(
@@ -453,23 +458,32 @@ export class PoliceOfficer {
     this.target += this.direction;
   }
 
-  private buildSprite(scene: Phaser.Scene): Phaser.GameObjects.Container {
-    const g = inkify(scene.add.graphics(), 1.25);
-    // Drawn facing up, like the player: inked, with a big cap over a big head.
-    g.fillStyle(0xf3cfa4, 1);
-    g.fillCircle(-15, 2, 5);
-    g.fillCircle(15, 2, 5);
-    g.fillStyle(COLORS.officer, 1);
-    g.fillEllipse(0, 2, 32, 19);
-    g.fillStyle(0xf2c94c, 1);
-    g.fillRect(-11, -1, 4, 3); // badge
-    g.fillStyle(COLORS.officerCap, 1);
-    g.fillCircle(0, 0, 11);
-    g.fillStyle(0x0b1326, 1);
-    g.fillEllipse(0, -9.5, 15, 7); // cap peak
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(-2, -3, 4, 3);
-    return scene.add.container(this.x, this.y, [g]).setScale(CHARACTER_SCALE);
+  /** The officer is drawn once into a texture shared by every officer, then shown as an image. */
+  private buildSprite(scene: Phaser.Scene): Phaser.GameObjects.Image {
+    const key = 'officer-sprite';
+    const res = 2; // baked at twice the size for sharpness
+    if (!scene.textures.exists(key)) {
+      const g = inkify(scene.make.graphics({}, false), 1.25);
+      // Drawn facing up, like the player: inked, with a big cap over a big head.
+      g.fillStyle(0xf3cfa4, 1);
+      g.fillCircle(-15, 2, 5);
+      g.fillCircle(15, 2, 5);
+      g.fillStyle(COLORS.officer, 1);
+      g.fillEllipse(0, 2, 32, 19);
+      g.fillStyle(0xf2c94c, 1);
+      g.fillRect(-11, -1, 4, 3); // badge
+      g.fillStyle(COLORS.officerCap, 1);
+      g.fillCircle(0, 0, 11);
+      g.fillStyle(0x0b1326, 1);
+      g.fillEllipse(0, -9.5, 15, 7); // cap peak
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(-2, -3, 4, 3);
+      g.setScale(res);
+      const dt = scene.textures.addDynamicTexture(key, 64 * res, 64 * res)!;
+      dt.draw(g, 32 * res, 32 * res).render();
+      g.destroy();
+    }
+    return scene.add.image(this.x, this.y, key).setScale(CHARACTER_SCALE / res);
   }
 
   private syncSprite(): void {

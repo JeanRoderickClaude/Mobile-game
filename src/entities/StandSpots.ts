@@ -42,6 +42,9 @@ export class StandSpots {
   private guides: Phaser.GameObjects.Graphics;
   private ring: Phaser.GameObjects.Graphics;
   private label: Phaser.GameObjects.Text;
+  /** What the guides and the ring were last drawn for; neither is redrawn while it is unchanged. */
+  private guideKey = '';
+  private ringKey = '';
 
   constructor(scene: Phaser.Scene, posters: PosterSpot[], tags: TagSpot[]) {
     for (const p of posters) {
@@ -98,8 +101,12 @@ export class StandSpots {
    * for those off-screen. view is the camera's world view.
    */
   drawGuides(view: Phaser.Geom.Rectangle, pipX: number, pipY: number, now: number): void {
-    const pulse = 0.5 + 0.5 * Math.sin((now / PULSE_MS) * Math.PI * 2);
+    // The breathing is stepped in 32ths, so a player standing still redraws a few times a second, not every frame.
+    const pulse = Math.round((0.5 + 0.5 * Math.sin((now / PULSE_MS) * Math.PI * 2)) * 32) / 32;
     const alpha = 0.4 + 0.45 * pulse;
+    const key = `${pulse}|${this.tasks.map((t) => (t.done ? 1 : 0)).join('')}|${Math.round(view.x)}|${Math.round(view.y)}|${Math.round(pipX)}|${Math.round(pipY)}`;
+    if (key === this.guideKey) return;
+    this.guideKey = key;
     const m = this.markers.clear();
     const g = this.guides.clear();
     const off: StandTask[] = [];
@@ -159,6 +166,9 @@ export class StandSpots {
   }
 
   private drawRing(active: StandTask | null): void {
+    const key = `${active ? this.tasks.indexOf(active) : -1}|${this.tasks.map((t) => Math.round(t.progress / 16)).join(',')}`;
+    if (key === this.ringKey) return;
+    this.ringKey = key;
     const g = this.ring.clear();
     this.label.setVisible(!!active);
     // Started spots keep a faint ring, so the player can see where to come back to.

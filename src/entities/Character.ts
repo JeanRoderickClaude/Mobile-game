@@ -30,6 +30,11 @@ export interface CharacterOptions {
   marker?: boolean;
   /** Render as one cached image instead of live layers. Top-down only. */
   baked?: boolean;
+  /**
+   * Baked, but the two hands stay separate images so they can swing while walking (the player).
+   * The marker ring is its own cached image too. Rebuilt only when the look changes.
+   */
+  animated?: boolean;
   /** "top" (default) for the game, "front" for full body facing the viewer. */
   view?: 'top' | 'front';
 }
@@ -55,12 +60,17 @@ export class Character extends Phaser.GameObjects.Container {
   private front: boolean;
   private walkTime = 0;
   private image: Phaser.GameObjects.Image | null = null;
+  private hands: Phaser.GameObjects.Image[] = [];
+  private animated: boolean;
 
   constructor(scene: Phaser.Scene, x: number, y: number, look: PlayerLook = DEFAULT_LOOK, options: CharacterOptions = {}) {
     super(scene, x, y);
     this.look = { ...look };
     this.front = options.view === 'front';
-    if (options.marker && !this.front) {
+    this.animated = !!options.animated && !this.front;
+    if (options.marker && !this.front && this.animated) {
+      this.add(new Phaser.GameObjects.Image(scene, 0, 0, ringTexture(scene)).setScale(1 / BAKE_RES));
+    } else if (options.marker && !this.front) {
       const ring = scene.add.graphics();
       ring.fillStyle(0xff3fa4, 0.3).fillCircle(0, 2, 21);
       ring.lineStyle(2.5, 0xffffff, 0.9).strokeCircle(0, 2, 21);
@@ -79,6 +89,10 @@ export class Character extends Phaser.GameObjects.Container {
     const s = this.front ? HEAD_SCALE_FRONT : HEAD_SCALE_TOP;
     const pivotY = this.front ? NECK_Y : 0;
     for (const g of [this.headLayer, this.hairBackLayer, this.hairLayer, this.hatLayer]) g.setScale(s).setPosition(0, pivotY * (1 - s));
+    if (this.animated) {
+      this.hands = [0, 1].map(() => new Phaser.GameObjects.Image(scene, 0, 0, '__DEFAULT').setScale(1 / BAKE_RES));
+      this.add(this.hands);
+    }
     this.redrawBody();
     this.redrawOutfit();
     this.redrawSign();
@@ -86,7 +100,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.redrawHat();
     if (this.front) {
       this.add([this.signLayer, this.bodyLayer, this.outfitLayer, this.hairBackLayer, this.headLayer, this.hairLayer, this.hatLayer]);
-    } else if (options.baked) {
+    } else if (options.baked || this.animated) {
       // Created after the layers are drawn, so the first bake sees every layer.
       this.image = new Phaser.GameObjects.Image(scene, 0, 0, '__DEFAULT').setScale(1 / BAKE_RES);
       this.add(this.image);
@@ -152,7 +166,7 @@ export class Character extends Phaser.GameObjects.Container {
     } else {
       this.walkTime = 0;
     }
-    if (this.image || this.front) return;
+    if ((this.image && !this.animated) || this.front) return;
     const swing = moving ? Math.sin(this.walkTime / 90) * 4 : 0;
     this.drawHands(swing);
   }
@@ -179,6 +193,12 @@ export class Character extends Phaser.GameObjects.Container {
 
   private drawHands(swing: number): void {
     const skin = BODIES[this.look.body].skin;
+    if (this.animated) {
+      const key = handTexture(this.scene, skin);
+      this.hands[0].setTexture(key).setPosition(-15, 2 - swing);
+      this.hands[1].setTexture(key).setPosition(15, 2 + swing);
+      return;
+    }
     const g = this.bodyLayer;
     if (this.front) {
       // Trousers, shoes and hands. The outfit draws the sleeves over the top.
@@ -229,15 +249,24 @@ export class Character extends Phaser.GameObjects.Container {
     this.bake();
   }
 
+  /** Tints every image of an animated character (the night darkens Pip like the world). */
+  setImageTint(color: number): this {
+    for (const o of this.list) if (o instanceof Phaser.GameObjects.Image) o.setTint(color);
+    return this;
+  }
+
   /** For baked characters: point the image at the texture for the current look, rendering it once if new. */
   private bake(): void {
     if (!this.image) return;
     const { body, outfit, sign, hat, hair, hairColor } = this.look;
-    const key = `character:${String(body)}:${String(outfit)}:${String(sign)}:${String(hat)}:${String(hair)}:${String(hairColor)}`;
+    const key = `character${this.animated ? '-animated' : ''}:${String(body)}:${String(outfit)}:${String(sign)}:${String(hat)}:${String(hair)}:${String(hairColor)}`;
     const textures = this.scene.textures;
     if (!textures.exists(key)) {
       const dt = textures.addDynamicTexture(key, BAKE_SIZE, BAKE_SIZE)!;
-      const layers = [this.bodyLayer, this.outfitLayer, this.signLayer, this.headLayer, this.hairLayer, this.hatLayer];
+      // An animated character's hands are separate images, so its body layer stays out of the bake.
+      const layers = this.animated
+        ? [this.outfitLayer, this.signLayer, this.headLayer, this.hairLayer, this.hatLayer]
+        : [this.bodyLayer, this.outfitLayer, this.signLayer, this.headLayer, this.hairLayer, this.hatLayer];
       const base = new Map(layers.map((g) => [g, g.scaleX] as const));
       for (const g of layers) g.setScale(base.get(g)! * BAKE_RES);
       dt.draw(layers, BAKE_SIZE / 2, BAKE_SIZE / 2).render();
@@ -245,4 +274,31 @@ export class Character extends Phaser.GameObjects.Container {
     }
     this.image.setTexture(key);
   }
+}
+
+/** The player's marker ring (pink disc, white outline) as a cached texture. */
+function ringTexture(scene: Phaser.Scene): string {
+  const key = 'player-ring';
+  if (scene.textures.exists(key)) return key;
+  const g = scene.make.graphics({}, false);
+  g.fillStyle(0xff3fa4, 0.3).fillCircle(0, 2, 21);
+  g.lineStyle(2.5, 0xffffff, 0.9).strokeCircle(0, 2, 21);
+  g.setScale(BAKE_RES);
+  const dt = scene.textures.addDynamicTexture(key, BAKE_SIZE, BAKE_SIZE)!;
+  dt.draw(g, BAKE_SIZE / 2, BAKE_SIZE / 2).render();
+  g.destroy();
+  return key;
+}
+
+/** One inked hand (a skin-coloured circle) as a cached texture per skin tone. */
+function handTexture(scene: Phaser.Scene, skin: number): string {
+  const key = `hand:${skin}`;
+  if (scene.textures.exists(key)) return key;
+  const g = inkify(scene.make.graphics({}, false), OUTLINE_TOP);
+  g.fillStyle(skin, 1).fillCircle(0, 0, 5);
+  g.setScale(BAKE_RES);
+  const dt = scene.textures.addDynamicTexture(key, BAKE_SIZE / 2, BAKE_SIZE / 2)!;
+  dt.draw(g, BAKE_SIZE / 4, BAKE_SIZE / 4).render();
+  g.destroy();
+  return key;
 }
