@@ -24,10 +24,15 @@ export interface SaveData {
   completed: string[];
   /** Story flags set by dialogue choices. */
   flags: Flags;
+  /** Show the frame rate in a corner during levels (menu toggle). */
+  showFps: boolean;
 }
 
+/** Story flags that were renamed: old name to new name. Saves are migrated when they load. */
+const RENAMED_FLAGS: Record<string, string> = { van_tagged: 'vanTagged' };
+
 function fresh(): SaveData {
-  return { coins: 0, owned: [], equipped: { ...DEFAULT_ITEMS }, difficulty: DEFAULT_DIFFICULTY, completed: [], flags: {} };
+  return { coins: 0, owned: [], equipped: { ...DEFAULT_ITEMS }, difficulty: DEFAULT_DIFFICULTY, completed: [], flags: {}, showFps: false };
 }
 
 let state: SaveData = load();
@@ -52,7 +57,8 @@ function load(): SaveData {
   } catch {
     return fresh();
   }
-  if (migrated) {
+  // A renamed story flag or an older key: write the migrated save back.
+  if (migrated || raw.includes('"van_tagged"')) {
     try {
       window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch {
@@ -78,8 +84,14 @@ function sanitize(input: unknown): SaveData {
   out.difficulty = typeof data.difficulty === 'string' && Object.hasOwn(DIFFICULTIES, data.difficulty) ? data.difficulty : LEGACY_DIFFICULTY;
   if (Array.isArray(data.completed)) out.completed = [...new Set(data.completed.filter((id) => typeof id === 'string'))];
   if (data.flags && typeof data.flags === 'object' && !Array.isArray(data.flags)) {
-    for (const [name, value] of Object.entries(data.flags)) if (isFlagValue(value)) out.flags[name] = value;
+    for (const [name, value] of Object.entries(data.flags)) if (isFlagValue(value)) out.flags[RENAMED_FLAGS[name] ?? name] = value;
+    // A save that has both names keeps the new one's value.
+    for (const [oldName, newName] of Object.entries(RENAMED_FLAGS)) {
+      const value = (data.flags as Flags)[newName];
+      if (oldName in data.flags && isFlagValue(value)) out.flags[newName] = value;
+    }
   }
+  out.showFps = data.showFps === true;
   return out;
 }
 
@@ -134,6 +146,15 @@ export function getDifficulty(): Difficulty {
 
 export function setDifficulty(difficulty: Difficulty): void {
   state.difficulty = difficulty;
+  persist();
+}
+
+export function getShowFps(): boolean {
+  return state.showFps;
+}
+
+export function setShowFps(on: boolean): void {
+  state.showFps = on;
   persist();
 }
 

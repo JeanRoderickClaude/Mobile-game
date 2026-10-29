@@ -20,7 +20,7 @@ import { Atmosphere } from '../systems/atmosphere';
 import { NightOverlay } from '../systems/night';
 import { StandSpots } from '../entities/StandSpots';
 import { NavGrid } from '../systems/nav';
-import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags, setFlags } from '../systems/save';
+import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags, getShowFps, setFlags } from '../systems/save';
 import { playCoin } from '../systems/sfx';
 import { VirtualJoystick } from '../systems/VirtualJoystick';
 import { CoinLabel } from '../ui/widgets';
@@ -82,6 +82,9 @@ export class GameScene extends Phaser.Scene {
   /** The gray look and its colour mask, in levels with "noir". */
   private noir: Noir | null = null;
   private atmosphere: Atmosphere | null = null;
+  /** The frame rate readout (menu setting "Show FPS"), or null when it is off. */
+  private fpsText: Phaser.GameObjects.Text | null = null;
+  private fpsAt = 0;
   private colorBar: Phaser.GameObjects.Graphics | null = null;
   private difficulty: Difficulty = 'normal';
   private catchTimeMs = 500;
@@ -132,6 +135,7 @@ export class GameScene extends Phaser.Scene {
     this.trumpetOverride = false;
     this.noir = null;
     this.atmosphere = null;
+    this.fpsText = null;
     this.colorBar = null;
     this.nightOverlay = null;
     this.posterText = null;
@@ -221,6 +225,13 @@ export class GameScene extends Phaser.Scene {
       const cfg = DIFFICULTIES[this.difficulty];
       this.nightOverlay = new NightOverlay(this, this.level.night.lights, cfg.darkness, cfg.pipLightRadius);
     }
+    if (getShowFps()) {
+      this.fpsText = this.add
+        .text(8, GAME_HEIGHT - 8, '', { fontFamily: 'Arial, sans-serif', fontSize: '16px', color: '#9fe3ff', stroke: '#000', strokeThickness: 3 })
+        .setOrigin(0, 1)
+        .setScrollFactor(0)
+        .setDepth(95);
+    }
     this.assistHint = this.add
       .text(GAME_WIDTH / 2, 925, '', { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#7be08f', stroke: '#000', strokeThickness: 3 })
       .setOrigin(0.5)
@@ -260,6 +271,10 @@ export class GameScene extends Phaser.Scene {
     this.nightOverlay?.update(this.cameras.main.worldView, this.player.x, this.player.y, this.officers);
 
     this.timerText.setText(formatTime(this.elapsedMs));
+    if (this.fpsText && this.time.now - this.fpsAt > 400) {
+      this.fpsAt = this.time.now;
+      this.fpsText.setText(`${Math.round(this.game.loop.actualFps)} fps`);
+    }
 
     const atFinish = this.inRect(this.player.x, this.player.y, this.level.finish);
     const open = this.finishOpen();
