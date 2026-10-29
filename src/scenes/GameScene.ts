@@ -16,8 +16,9 @@ import { CHAPTERS, isPlayable, pickScene } from '../story/story';
 import { finishBonus } from '../systems/economy';
 import { overlaps } from '../systems/geometry';
 import { Noir } from '../systems/noir';
+import { bakeAtlas, type BakeItem } from '../systems/bake';
+import { Bar } from '../ui/bar';
 import { Atmosphere } from '../systems/atmosphere';
-import { NightOverlay } from '../systems/night';
 import { StandSpots } from '../entities/StandSpots';
 import { NavGrid } from '../systems/nav';
 import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags, getShowFps, setFlags } from '../systems/save';
@@ -57,7 +58,10 @@ export class GameScene extends Phaser.Scene {
   private ringClock = 0;
   private rings: { x: number; y: number; age: number }[] = [];
   private ringGfx!: Phaser.GameObjects.Graphics;
-  private noiseBar!: Phaser.GameObjects.Graphics;
+  private noiseBar!: Bar;
+  /** What the colour progress bar last showed, so it is only redrawn when that changes. */
+  private colorBarKey = -1;
+  private ringsDrawn = false;
   private trumpetPointer: number | null = null; // touch on the on-screen trumpet button
   private trumpetButton: Phaser.GameObjects.Container | null = null;
   /** Set by the balance tools to play without a key or touch. */
@@ -73,7 +77,6 @@ export class GameScene extends Phaser.Scene {
   private moveDirX = 0;
   private moveDirY = 0;
   /** Night darkness over the screen, in levels with "night". */
-  private nightOverlay: NightOverlay | null = null;
   /** Poster and tag spots, the poster count in the HUD, and the closed finish. */
   private spots!: StandSpots;
   private posterText: Phaser.GameObjects.Text | null = null;
@@ -94,14 +97,14 @@ export class GameScene extends Phaser.Scene {
   private elapsedMs = 0;
   private finished = false;
   private timerText!: Phaser.GameObjects.Text;
-  private meter!: Phaser.GameObjects.Graphics;
+  private meter!: Bar;
   private hiddenIcon!: Phaser.GameObjects.Container;
   private playerSpeed = 0; // actual units per second over the last frame
   private hidden = false;
   /** Chase levels: stamina 0..1, whether Pip is winded (capped to crowd pace until it recovers), and its bar. */
   private stamina = 1;
   private tired = false;
-  private staminaBar!: Phaser.GameObjects.Graphics;
+  private staminaBar!: Bar;
 
   constructor() {
     super('game');
@@ -137,7 +140,6 @@ export class GameScene extends Phaser.Scene {
     this.atmosphere = null;
     this.fpsText = null;
     this.colorBar = null;
-    this.nightOverlay = null;
     this.posterText = null;
     this.gate = null;
     const cfg = DIFFICULTIES[this.difficulty];
@@ -162,8 +164,12 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, width, height);
 
     this.drawStreet();
-    this.level.obstacles.forEach((o, i) => this.drawObstacle(o, i));
-    if (this.level.night) this.drawLamps();
+    // Buildings, cars and lamp posts: baked once into one small atlas, each shown as an image where it stands.
+    const items: BakeItem[] = this.level.obstacles.map((o, i) => ({
+      x: o.x, y: o.y, width: o.width + 5, height: o.height + 6, draw: (g) => this.drawObstacle(g, o, i),
+    }));
+    for (const l of this.level.night?.lights ?? []) items.push({ x: l.x - 6, y: l.y - 6, width: 12, height: 12, draw: (g) => this.paintLampPost(g, l) });
+    bakeAtlas(this, 'obstacles', 10, items);
     this.spots = new StandSpots(this, this.level.posters?.spots ?? [], this.level.tags ?? []);
     if (this.level.posters) this.gate = this.buildGate();
 
@@ -177,11 +183,13 @@ export class GameScene extends Phaser.Scene {
     this.bystanders = new Bystanders(this, this.level.bystanders ?? [], this.blockers);
     this.ringGfx = this.add.graphics().setDepth(6);
 
-    this.player = new Character(this, this.level.start.x, this.level.start.y, equippedLook(), { marker: true }).setDepth(30);
+    this.player = new Character(this, this.level.start.x, this.level.start.y, equippedLook(), { marker: true, animated: true }).setDepth(30);
+    // At night Pip sits in his own hole of light in the darkness, about 80 percent as bright as in the day.
+    if (this.level.night) this.player.setImageTint(0xcdcdcd);
     this.cameras.main.startFollow(this.player, true, 1, 0.15);
 
-    this.meter = this.add.graphics().setDepth(40);
-    this.staminaBar = this.add.graphics().setDepth(40);
+    this.meter = new Bar(this, 40);
+    this.staminaBar = new Bar(this, 40);
     this.hiddenIcon = this.buildHiddenIcon();
 
     const kb = this.input.keyboard!;
@@ -221,10 +229,6 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(90);
-    if (this.level.night) {
-      const cfg = DIFFICULTIES[this.difficulty];
-      this.nightOverlay = new NightOverlay(this, this.level.night.lights, cfg.darkness, cfg.pipLightRadius);
-    }
     if (getShowFps()) {
       this.fpsText = this.add
         .text(8, GAME_HEIGHT - 8, '', { fontFamily: 'Arial, sans-serif', fontSize: '16px', color: '#9fe3ff', stroke: '#000', strokeThickness: 3 })
@@ -239,15 +243,17 @@ export class GameScene extends Phaser.Scene {
       .setDepth(90)
       .setAlpha(0.85);
 
-    if (this.level.noir) {
+    if (this.level.noir || this.level.night) {
       // Everything in the world goes into the filtered layer, except Pip, his
       // suspicion bar and hidden icon (always in colour) and the HUD (scroll factor 0).
-      const keep = new Set<Phaser.GameObjects.GameObject>([this.player, this.meter, this.staminaBar, this.hiddenIcon, ...this.spots.overlay]);
+      const keep = new Set<Phaser.GameObjects.GameObject>([this.player, ...this.meter.objects, ...this.staminaBar.objects, this.hiddenIcon, ...this.spots.overlay]);
       const world = this.children.list.filter((o) => !keep.has(o) && (o as unknown as { scrollFactorX?: number }).scrollFactorX !== 0);
-      this.noir = new Noir(this, this.level.noir.zones);
+      const cfg = DIFFICULTIES[this.difficulty];
+      const night = this.level.night ? { lamps: this.level.night.lights, darkness: cfg.darkness, pipRadius: cfg.pipLightRadius } : null;
+      this.noir = new Noir(this, this.level.noir?.zones ?? [], night, !!this.level.noir);
       this.noir.adopt(world);
       this.noir.layer.setDepth(29);
-      this.atmosphere = new Atmosphere(this, this.level, this.noir);
+      if (this.level.noir) this.atmosphere = new Atmosphere(this, this.level, this.noir);
     }
   }
 
@@ -265,10 +271,9 @@ export class GameScene extends Phaser.Scene {
     const cfg = DIFFICULTIES[this.difficulty];
     this.bystanders.update(dt, this.player.x, this.player.y, this.playing, this.hearingRadius, cfg.lingerMs);
     this.updateSpots(dt);
-    this.noir?.update(dt, this.cameras.main.worldView, this.player.x, this.player.y, this.playing, this.hearingRadius, this.rings, RING_LIFE_MS);
+    this.noir?.update(dt, this.cameras.main.worldView, this.player.x, this.player.y, this.playing, this.hearingRadius, this.rings, RING_LIFE_MS, this.officers);
     this.atmosphere?.update(dt);
     this.updateDetection(dt);
-    this.nightOverlay?.update(this.cameras.main.worldView, this.player.x, this.player.y, this.officers);
 
     this.timerText.setText(formatTime(this.elapsedMs));
     if (this.fpsText && this.time.now - this.fpsAt > 400) {
@@ -401,13 +406,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawStamina(): void {
-    const g = this.staminaBar.clear();
     if (!this.level.chaseMode) return;
-    const x = this.player.x - 20;
-    const y = this.player.y + 30 * CHARACTER_SCALE;
     const color = this.tired ? 0xe05a4f : this.stamina < 0.3 ? 0xffd23f : 0x7be08f;
-    g.fillStyle(0x000000, 0.6).fillRect(x - 2, y - 2, 44, 9);
-    g.fillStyle(color, 1).fillRect(x, y, 40 * this.stamina, 5);
+    this.staminaBar.place(this.player.x - 20, this.player.y + 30 * CHARACTER_SCALE, 40, 5, 2, this.stamina, color);
   }
 
   /** Returns the corrected coordinate on one axis after pushing out of blockers and world edges. */
@@ -447,13 +448,8 @@ export class GameScene extends Phaser.Scene {
       o.drawCone(this.blockers, o.chasing ? 1 : seesPlayer ? alert : 0);
     }
 
-    this.meter.clear();
-    if (alert > 0) {
-      const x = this.player.x - 20;
-      const y = this.player.y - 32 * CHARACTER_SCALE;
-      this.meter.fillStyle(0x000000, 0.6).fillRect(x - 2, y - 2, 44, 10);
-      this.meter.fillStyle(COLORS.coneAlert, 1).fillRect(x, y, 40 * alert, 6);
-    }
+    if (alert > 0) this.meter.place(this.player.x - 20, this.player.y - 32 * CHARACTER_SCALE, 40, 6, 2, alert, COLORS.coneAlert);
+    else this.meter.hide();
 
     this.drawStamina();
     this.hiddenIcon.setVisible(this.hidden).setPosition(x, y - 58 * CHARACTER_SCALE);
@@ -637,18 +633,10 @@ export class GameScene extends Phaser.Scene {
     return this.add.container(0, 0, [g, label]).setDepth(12);
   }
 
-  /** Street lamps: a post and a warm pool of light. */
-  private drawLamps(): void {
-    const g = this.add.graphics().setDepth(3);
-    for (const l of this.level.night!.lights) {
-      g.fillStyle(0xffe8a0, 0.1).fillCircle(l.x, l.y, l.radius);
-      g.fillStyle(0xffe8a0, 0.1).fillCircle(l.x, l.y, l.radius * 0.6);
-    }
-    const posts = this.add.graphics().setDepth(12);
-    for (const l of this.level.night!.lights) {
-      posts.fillStyle(0x2b2d33, 1).fillCircle(l.x, l.y, 6);
-      posts.fillStyle(0xfff1b8, 1).fillCircle(l.x, l.y, 3.5);
-    }
+  /** Street lamp posts (the warm pools are painted into the street). */
+  private paintLampPost(g: Phaser.GameObjects.Graphics, l: { x: number; y: number }): void {
+    g.fillStyle(0x2b2d33, 1).fillCircle(l.x, l.y, 6);
+    g.fillStyle(0xfff1b8, 1).fillCircle(l.x, l.y, 3.5);
   }
 
   /** Reads the trumpet input, fills or drains the noise meter, calls officers when it fills, draws the rings. */
@@ -673,8 +661,10 @@ export class GameScene extends Phaser.Scene {
       this.rings.push({ x: this.player.x, y: this.player.y, age: 0 });
       this.ringClock = RING_INTERVAL_MS;
     }
-    this.ringGfx.clear();
     this.rings = this.rings.filter((r) => (r.age += dt) < RING_LIFE_MS);
+    // The rings only change while some are in flight (and once more when the last one ends).
+    if (this.rings.length || this.ringsDrawn) this.ringGfx.clear();
+    this.ringsDrawn = this.rings.length > 0;
     for (const r of this.rings) {
       const t = r.age / RING_LIFE_MS;
       this.ringGfx.lineStyle(3, 0xffd23f, 0.75 * (1 - t)).strokeCircle(r.x, r.y, 20 + (this.hearingRadius - 20) * t);
@@ -688,7 +678,9 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5, 0)
       .setScrollFactor(0)
       .setDepth(90);
-    this.noiseBar = this.add.graphics().setScrollFactor(0).setDepth(90);
+    this.noiseBar = new Bar(this, 90, true);
+    // The frame around the meter never changes, so it is drawn once, above the fill.
+    this.add.graphics().setScrollFactor(0).setDepth(90).lineStyle(2, 0xffffff, 0.8).strokeRect(GAME_WIDTH / 2 - 78, 35, 156, 18);
     if (this.level.noir?.zones.some((z) => z.musicMs !== undefined)) this.colorBar = this.add.graphics().setScrollFactor(0).setDepth(90);
     if (!this.sys.game.device.input.touch) {
       this.add
@@ -704,16 +696,20 @@ export class GameScene extends Phaser.Scene {
     if (!this.noiseBar) return;
     const w = 150;
     const x = GAME_WIDTH / 2 - w / 2;
-    const g = this.noiseBar.clear();
-    g.fillStyle(0x000000, 0.6).fillRect(x - 3, 35, w + 6, 18);
     const color = this.noise > 0.75 ? 0xff4a4a : this.noise > 0.5 ? 0xf2994a : 0xffd23f;
-    g.fillStyle(color, 1).fillRect(x, 38, w * this.noise, 12);
-    g.lineStyle(2, 0xffffff, 0.8).strokeRect(x - 3, 35, w + 6, 18);
+    this.noiseBar.place(x, 38, w, 12, 3, this.noise, color);
 
     // Under it, while Pip stands in a gray zone music can win: how close it is to turning colour.
-    const c = this.colorBar?.clear();
     const progress = this.noir?.progressAt(this.player.x, this.player.y) ?? null;
-    if (c && progress !== null) {
+    const key = progress === null ? -1 : Math.round(w * progress);
+    if (this.colorBar && key !== this.colorBarKey) {
+      this.colorBarKey = key;
+      this.drawColorBar(this.colorBar.clear(), x, w, progress);
+    }
+  }
+
+  private drawColorBar(c: Phaser.GameObjects.Graphics, x: number, w: number, progress: number | null): void {
+    if (progress !== null) {
       c.fillStyle(0x000000, 0.6).fillRect(x - 3, 56, w + 6, 10);
       const stripes = [0xff3fa4, 0xf2994a, 0xffd23f, 0x7be08f, 0x5ca9e6];
       const filled = w * progress;
@@ -788,9 +784,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawStreet(): void {
+    const { finish } = this.level;
+    // The street is flat colour over the whole screen: as live Graphics it fills faster than a full-screen texture would.
+    this.paintStreet(this.add.graphics().setDepth(0));
+    const sq = 18;
+    this.add
+      .text(finish.x + finish.width / 2, finish.y + (finish.height - sq) / 2, this.level.finishLabel ?? 'FINISH', {
+        fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '30px', color: '#1d1f2b',
+      })
+      .setOrigin(0.5)
+      .setDepth(1);
+  }
+
+  private paintStreet(g: Phaser.GameObjects.Graphics): void {
     const { width, height, start, finish } = this.level;
-    const g = this.add.graphics().setDepth(0);
-    g.fillStyle(COLORS.sidewalk, 1).fillRect(0, 0, width, height);
+    // The sidewalks are only the two side strips: the road covers the middle, so nothing is filled twice.
+    g.fillStyle(COLORS.sidewalk, 1).fillRect(0, 0, 125, height).fillRect(width - 125, 0, 125, height);
     g.fillStyle(COLORS.road, 1).fillRect(125, 0, width - 250, height);
     // Dashed centre line.
     g.fillStyle(COLORS.laneMark, 0.8);
@@ -805,18 +814,17 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(odd ? 0x000000 : 0xffffff, 1).fillRect(x, finish.y + finish.height - sq, sq, sq / 2);
       g.fillStyle(odd ? 0xffffff : 0x000000, 1).fillRect(x, finish.y + finish.height - sq / 2, sq, sq / 2);
     }
-    this.add
-      .text(finish.x + finish.width / 2, finish.y + (finish.height - sq) / 2, this.level.finishLabel ?? 'FINISH', {
-        fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '30px', color: '#1d1f2b',
-      })
-      .setOrigin(0.5)
-      .setDepth(1);
+    if (this.level.night) {
+      for (const l of this.level.night.lights) {
+        g.fillStyle(0xffe8a0, 0.1).fillCircle(l.x, l.y, l.radius);
+        g.fillStyle(0xffe8a0, 0.1).fillCircle(l.x, l.y, l.radius * 0.6);
+      }
+    }
   }
 
-  private drawObstacle(o: Obstacle, index: number): void {
+  private drawObstacle(g: Phaser.GameObjects.Graphics, o: Obstacle, index: number): void {
     const palette = o.type === 'building' ? COLORS.building : COLORS.car;
     const color = o.color ? Phaser.Display.Color.HexStringToColor(o.color).color : palette[index % palette.length];
-    const g = this.add.graphics().setDepth(10);
     // Drop shadow.
     g.fillStyle(0x000000, 0.25).fillRoundedRect(o.x + 4, o.y + 5, o.width, o.height, o.type === 'car' ? 8 : 2);
     if (o.style === 'water') {

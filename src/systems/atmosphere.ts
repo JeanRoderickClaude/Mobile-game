@@ -16,6 +16,8 @@ const WINDOW = 0xffd88a;
 const GOLD = 0xff9f2e; // the golden grade of coloured ground
 const RAIN = 0xbcd6ff;
 const RAIN_DROPS = 70;
+const RAIN_TILT = Math.atan(0.16); // the streak leans with the wind: 0.16 across for every 1 down
+const RAIN_STRETCH = Math.sqrt(1 + 0.16 * 0.16);
 const SETTLE_MS = 1600; // a won zone takes this long to finish colouring, then the reflections are redrawn once more
 
 interface Drop {
@@ -26,9 +28,12 @@ interface Drop {
 }
 
 export class Atmosphere {
+  // Both are drawn only when a zone changes colour, never per frame. Baking them into full-screen
+  // textures cost more fill than the few hundred small shapes cost to draw.
   private glow: Phaser.GameObjects.Graphics; // additive: halos and reflections
   private cores: Phaser.GameObjects.Graphics; // the lit windows and the neon tubes themselves
-  private rain: Phaser.GameObjects.Graphics | null = null;
+  /** A fixed pool of streaks sharing one white texture, moved each frame. */
+  private rain: Phaser.GameObjects.Image[] = [];
   private drops: Drop[] = [];
   private revision = -1;
   private settleAt = 0;
@@ -40,8 +45,10 @@ export class Atmosphere {
     this.glow = scene.add.graphics().setDepth(base).setBlendMode(Phaser.BlendModes.ADD);
     this.cores = scene.add.graphics().setDepth(base + 0.05);
     if (level.night) {
-      this.rain = scene.add.graphics().setScrollFactor(0).setDepth(base + 0.1);
-      for (let i = 0; i < RAIN_DROPS; i++) this.drops.push(this.newDrop(true));
+      for (let i = 0; i < RAIN_DROPS; i++) {
+        this.drops.push(this.newDrop(true));
+        this.rain.push(scene.add.image(0, 0, '__WHITE').setOrigin(0.5, 1).setRotation(RAIN_TILT).setTint(RAIN).setAlpha(0.4).setScrollFactor(0).setDepth(base + 0.1));
+      }
     }
     this.redraw();
   }
@@ -56,7 +63,7 @@ export class Atmosphere {
       this.settleAt = 0;
       this.redraw();
     }
-    if (this.rain) this.updateRain(deltaMs);
+    if (this.rain.length) this.updateRain(deltaMs);
   }
 
   private tone(x: number, y: number): number {
@@ -71,8 +78,10 @@ export class Atmosphere {
   }
 
   private redraw(): void {
-    const glow = this.glow.clear();
-    const cores = this.cores.clear();
+    this.drawLights(this.glow.clear(), this.cores.clear());
+  }
+
+  private drawLights(glow: Phaser.GameObjects.Graphics, cores: Phaser.GameObjects.Graphics): void {
     const mid = this.level.width / 2;
 
     // The golden grade: a warm additive wash over every fully coloured zone, strongest at the top of each
@@ -143,14 +152,13 @@ export class Atmosphere {
   }
 
   private updateRain(deltaMs: number): void {
-    const g = this.rain!.clear();
-    g.lineStyle(1.3, RAIN, 0.4);
     const dt = deltaMs / 1000;
-    for (const d of this.drops) {
+    this.drops.forEach((d, i) => {
       d.y += d.speed * dt;
       d.x -= d.speed * 0.16 * dt;
       if (d.y > GAME_HEIGHT + 20 || d.x < -40) Object.assign(d, this.newDrop(false));
-      g.lineBetween(d.x, d.y, d.x + d.len * 0.16, d.y - d.len);
-    }
+      // The streak runs from (x, y) up and to the right by len; the image's foot is that point.
+      this.rain[i].setPosition(d.x, d.y).setDisplaySize(1.3, d.len * RAIN_STRETCH);
+    });
   }
 }
