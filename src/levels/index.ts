@@ -86,6 +86,11 @@ function validate(level: LevelData, path: string): LevelData {
     if (!level.trumpet) fail('"instrumentCase" uses the trumpet button; set "trumpet": true');
   }
   if (level.chaseMode !== undefined && typeof level.chaseMode !== 'boolean') fail('"chaseMode" must be true or false');
+  if (level.teun !== undefined) {
+    if (!level.teun || !isPoint(level.teun)) fail('"teun" needs "x" and "y"');
+    if (!level.chaseMode) fail('"teun" needs "chaseMode": true (an officer who spots him starts a chase)');
+    if (!level.trumpet) fail('"teun" needs "trumpet": true (his drum fills the noise meter)');
+  }
   if (level.neon !== undefined) {
     if (!Array.isArray(level.neon)) fail('"neon" must be an array');
     level.neon.forEach((n, i) => {

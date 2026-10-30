@@ -1,0 +1,444 @@
+{
+ "id": "level-05",
+ "name": "Tanner's Row",
+ "width": 540,
+ "height": 2400,
+ "start": {
+  "x": 270,
+  "y": 2310
+ },
+ "finish": {
+  "x": 0,
+  "y": 0,
+  "width": 540,
+  "height": 90
+ },
+ "finishLabel": "REHEARSAL",
+ "parTimeSec": 75,
+ "trumpet": true,
+ "chaseMode": true,
+ "teun": {
+  "x": 270,
+  "y": 2352
+ },
+ "obstacles": [
+  {
+   "type": "building",
+   "x": 0,
+   "y": 2150,
+   "width": 90,
+   "height": 250,
+   "color": "#c96f53"
+  },
+  {
+   "type": "building",
+   "x": 450,
+   "y": 2150,
+   "width": 90,
+   "height": 250,
+   "color": "#8f6bb0"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 1700,
+   "width": 150,
+   "height": 90,
+   "color": "#4f7fa8"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 1860,
+   "width": 150,
+   "height": 290,
+   "color": "#b2874a"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 1790,
+   "width": 60,
+   "height": 70,
+   "color": "#6e8f5e"
+  },
+  {
+   "type": "building",
+   "x": 390,
+   "y": 1700,
+   "width": 150,
+   "height": 90,
+   "color": "#a85f6e"
+  },
+  {
+   "type": "building",
+   "x": 390,
+   "y": 1860,
+   "width": 150,
+   "height": 290,
+   "color": "#c96f53"
+  },
+  {
+   "type": "building",
+   "x": 480,
+   "y": 1790,
+   "width": 60,
+   "height": 70,
+   "color": "#8f6bb0"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 1450,
+   "width": 235,
+   "height": 250,
+   "color": "#4f7fa8"
+  },
+  {
+   "type": "building",
+   "x": 305,
+   "y": 1450,
+   "width": 235,
+   "height": 250,
+   "color": "#b2874a"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 900,
+   "width": 150,
+   "height": 120,
+   "color": "#6e8f5e"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 1090,
+   "width": 150,
+   "height": 360,
+   "color": "#a85f6e"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 1020,
+   "width": 60,
+   "height": 70,
+   "color": "#c96f53"
+  },
+  {
+   "type": "building",
+   "x": 390,
+   "y": 900,
+   "width": 150,
+   "height": 120,
+   "color": "#8f6bb0"
+  },
+  {
+   "type": "building",
+   "x": 390,
+   "y": 1090,
+   "width": 150,
+   "height": 360,
+   "color": "#4f7fa8"
+  },
+  {
+   "type": "building",
+   "x": 480,
+   "y": 1020,
+   "width": 60,
+   "height": 70,
+   "color": "#b2874a"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 650,
+   "width": 235,
+   "height": 250,
+   "color": "#6e8f5e"
+  },
+  {
+   "type": "building",
+   "x": 305,
+   "y": 650,
+   "width": 235,
+   "height": 250,
+   "color": "#a85f6e"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 150,
+   "width": 70,
+   "height": 150,
+   "color": "#c96f53"
+  },
+  {
+   "type": "building",
+   "x": 470,
+   "y": 150,
+   "width": 70,
+   "height": 150,
+   "color": "#8f6bb0"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 370,
+   "width": 70,
+   "height": 110,
+   "color": "#4f7fa8"
+  },
+  {
+   "type": "building",
+   "x": 470,
+   "y": 370,
+   "width": 70,
+   "height": 110,
+   "color": "#b2874a"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 550,
+   "width": 70,
+   "height": 100,
+   "color": "#6e8f5e"
+  },
+  {
+   "type": "building",
+   "x": 470,
+   "y": 550,
+   "width": 70,
+   "height": 100,
+   "color": "#a85f6e"
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 0,
+   "width": 120,
+   "height": 150,
+   "color": "#c96f53"
+  },
+  {
+   "type": "building",
+   "x": 420,
+   "y": 0,
+   "width": 120,
+   "height": 150,
+   "color": "#8f6bb0"
+  }
+ ],
+ "officers": [
+  {
+   "patrol": [
+    {
+     "x": 165,
+     "y": 2000
+    },
+    {
+     "x": 375,
+     "y": 2000
+    }
+   ],
+   "mode": "pingpong",
+   "speed": 55,
+   "pauseMs": 900,
+   "visionRange": 220,
+   "visionAngle": 58
+  },
+  {
+   "patrol": [
+    {
+     "x": 270,
+     "y": 1480
+    },
+    {
+     "x": 270,
+     "y": 1670
+    }
+   ],
+   "mode": "pingpong",
+   "speed": 50,
+   "pauseMs": 1500,
+   "visionRange": 230,
+   "visionAngle": 56
+  },
+  {
+   "patrol": [
+    {
+     "x": 270,
+     "y": 680
+    },
+    {
+     "x": 270,
+     "y": 870
+    }
+   ],
+   "mode": "pingpong",
+   "speed": 50,
+   "pauseMs": 1500,
+   "visionRange": 230,
+   "visionAngle": 56
+  },
+  {
+   "patrol": [
+    {
+     "x": 120,
+     "y": 250
+    },
+    {
+     "x": 420,
+     "y": 250
+    }
+   ],
+   "mode": "pingpong",
+   "speed": 60,
+   "pauseMs": 900,
+   "visionRange": 220,
+   "visionAngle": 58
+  }
+ ],
+ "crowds": [
+  {
+   "type": "standing",
+   "size": 6,
+   "x": 420,
+   "y": 1250,
+   "radius": 60
+  }
+ ],
+ "night": {
+  "lights": [
+   {
+    "x": 270,
+    "y": 2300,
+    "radius": 140
+   },
+   {
+    "x": 270,
+    "y": 2000,
+    "radius": 110
+   },
+   {
+    "x": 270,
+    "y": 1520,
+    "radius": 130
+   },
+   {
+    "x": 270,
+    "y": 1640,
+    "radius": 130
+   },
+   {
+    "x": 270,
+    "y": 720,
+    "radius": 130
+   },
+   {
+    "x": 270,
+    "y": 830,
+    "radius": 130
+   },
+   {
+    "x": 270,
+    "y": 250,
+    "radius": 120
+   },
+   {
+    "x": 270,
+    "y": 60,
+    "radius": 140
+   }
+  ]
+ },
+ "noir": {
+  "zones": [
+   {
+    "x": 0,
+    "y": 2150,
+    "width": 540,
+    "height": 250,
+    "start": "color"
+   },
+   {
+    "x": 0,
+    "y": 0,
+    "width": 540,
+    "height": 135,
+    "start": "color"
+   }
+  ]
+ },
+ "coins": [
+  {
+   "x": 270,
+   "y": 2200
+  },
+  {
+   "x": 270,
+   "y": 2060
+  },
+  {
+   "x": 105,
+   "y": 1825
+  },
+  {
+   "x": 480,
+   "y": 1825
+  },
+  {
+   "x": 270,
+   "y": 1300
+  },
+  {
+   "x": 105,
+   "y": 1055,
+   "value": 25
+  },
+  {
+   "x": 435,
+   "y": 1055
+  },
+  {
+   "x": 270,
+   "y": 560
+  },
+  {
+   "x": 270,
+   "y": 250
+  }
+ ],
+ "neon": [
+  {
+   "x": 84,
+   "y": 1960,
+   "width": 6,
+   "height": 48,
+   "color": "#ff3fa4"
+  },
+  {
+   "x": 150,
+   "y": 1560,
+   "width": 6,
+   "height": 48,
+   "color": "#29e0ff"
+  },
+  {
+   "x": 396,
+   "y": 820,
+   "width": 6,
+   "height": 48,
+   "color": "#ffb03a"
+  },
+  {
+   "x": 70,
+   "y": 500,
+   "width": 6,
+   "height": 48,
+   "color": "#9a6bff"
+  }
+ ]
+}

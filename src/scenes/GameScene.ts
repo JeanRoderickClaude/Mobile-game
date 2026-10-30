@@ -2,14 +2,16 @@ import Phaser from 'phaser';
 import {
   ASSIST_ANGLE_DEG, ASSIST_BREAK_STRENGTH, ASSIST_FLOOR_FACTOR, ASSIST_PACE_MAX, ASSIST_PACE_MIN, ASSIST_SETTLE_DIST, CHARACTER_SCALE, COIN_PICKUP_RADIUS, DIFFICULTIES, type Difficulty, COLORS, GAME_WIDTH, HIDDEN_DETECTION_RATE, HIDE_SPEED_FLOOR, HIDE_SPEED_MARGIN,
   NOISE_WALK_FACTOR, OFFICER_RADIUS, POSTER_ZONE, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, RING_INTERVAL_MS, RING_LIFE_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
-  CASE_DRAIN_FACTOR, CASE_REACH, CASE_SPEED_FACTOR,
+  CASE_DRAIN_FACTOR, CASE_REACH, CASE_SPEED_FACTOR, TEUN,
 } from '../config';
 import { Bystanders } from '../entities/Bystanders';
 import { Character } from '../entities/Character';
 import { Coin } from '../entities/Coin';
 import { drawCase, makeCaseImage } from '../entities/CaseItem';
 import { Crowd } from '../entities/Crowd';
+import { inkify } from '../entities/ink';
 import { PoliceOfficer } from '../entities/PoliceOfficer';
+import { Teun } from '../entities/Teun';
 import { LEVELS } from '../levels';
 import { resolveLevel } from '../levels/resolve';
 import type { Obstacle, Point, Rect, ResolvedLevel } from '../levels/types';
@@ -52,7 +54,7 @@ export class GameScene extends Phaser.Scene {
   private coinLabel!: CoinLabel;
   private blockers: Rect[] = [];
   private joystick!: VirtualJoystick;
-  private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift' | 'space' | 'x' | 'e', Phaser.Input.Keyboard.Key>;
+  private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift' | 'space' | 'x' | 'e' | 't', Phaser.Input.Keyboard.Key>;
   private bystanders!: Bystanders;
   /** Trumpet: playing this frame, the noise meter (0..1) and the sound rings in flight. */
   private playing = false;
@@ -117,6 +119,14 @@ export class GameScene extends Phaser.Scene {
   private stamina = 1;
   private tired = false;
   private staminaBar!: Bar;
+  /** Chapter 5: Teun, whether the crowd rules hide him this frame, and the follow / wait button. */
+  private teun: Teun | null = null;
+  private teunHidden = false;
+  private teunButton: Phaser.GameObjects.Container | null = null;
+  private teunButtonKey = '';
+  /** Where the sound comes from this frame (Pip's trumpet or Teun's drum), and whether there is any. */
+  private soundOn = false;
+  private soundSrc = { x: 0, y: 0 };
 
   constructor() {
     super('game');
@@ -150,6 +160,11 @@ export class GameScene extends Phaser.Scene {
     this.carrying = false;
     this.caseGround = this.caseCarried = this.caseHint = this.buttonTrumpet = this.buttonCase = null;
     this.caseMode = null;
+    this.teun = null;
+    this.teunHidden = false;
+    this.teunButton = null;
+    this.teunButtonKey = '';
+    this.soundOn = false;
     this.trumpetOverride = false;
     this.noir = null;
     this.atmosphere = null;
@@ -202,6 +217,7 @@ export class GameScene extends Phaser.Scene {
     // At night Pip sits in his own hole of light in the darkness, about 80 percent as bright as in the day.
     if (this.level.night) this.player.setImageTint(0xcdcdcd);
     this.cameras.main.startFollow(this.player, true, 1, 0.15);
+    if (this.level.teun) this.teun = new Teun(this, this.level.teun.x, this.level.teun.y, !!this.level.night, TEUN.restlessSec * (TEUN.restlessFactor[this.difficulty] ?? 1) * 1000);
 
     if (this.level.instrumentCase) this.buildCase();
     this.meter = new Bar(this, 40);
@@ -211,10 +227,11 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard!;
     const K = Phaser.Input.Keyboard.KeyCodes;
     this.keys = kb.addKeys({
-      up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D, shift: K.SHIFT, space: K.SPACE, x: K.X, e: K.E,
+      up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D, shift: K.SHIFT, space: K.SPACE, x: K.X, e: K.E, t: K.T,
     }) as typeof this.keys;
     if (this.level.trumpet && this.sys.game.device.input.touch) this.buildTrumpetButton();
-    this.joystick = new VirtualJoystick(this, (p) => this.onTrumpetButton(p));
+    if (this.teun) this.buildTeunButton();
+    this.joystick = new VirtualJoystick(this, (p) => this.onTeunButton(p) || this.onTrumpetButton(p));
 
     this.timerText = this.add
       .text(16, 14, '', { fontFamily: 'Arial, sans-serif', fontSize: '26px', color: COLORS.text, stroke: '#000', strokeThickness: 4 })
@@ -232,7 +249,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(90);
     this.coinLabel = new CoinLabel(this, 16, 64, 0).setScrollFactor(0).setDepth(90);
-    if (this.level.trumpet) this.buildNoiseMeter();
+    if (this.level.trumpet || this.teun) this.buildNoiseMeter();
     if (this.level.posters) {
       this.posterText = this.add
         .text(16, 92, '', { fontFamily: 'Arial, sans-serif', fontSize: '20px', color: COLORS.text, stroke: '#000', strokeThickness: 4 })
@@ -262,7 +279,7 @@ export class GameScene extends Phaser.Scene {
     if (this.level.noir || this.level.night) {
       // Everything in the world goes into the filtered layer, except Pip, his
       // suspicion bar and hidden icon (always in colour) and the HUD (scroll factor 0).
-      const keep = new Set<Phaser.GameObjects.GameObject>([this.player, ...this.meter.objects, ...this.staminaBar.objects, this.hiddenIcon, ...this.spots.overlay]);
+      const keep = new Set<Phaser.GameObjects.GameObject>([this.player, ...this.meter.objects, ...this.staminaBar.objects, this.hiddenIcon, ...this.spots.overlay, ...(this.teun?.objects ?? [])]);
       const world = this.children.list.filter((o) => !keep.has(o) && (o as unknown as { scrollFactorX?: number }).scrollFactorX !== 0);
       const cfg = DIFFICULTIES[this.difficulty];
       const night = this.level.night ? { lamps: this.level.night.lights, darkness: cfg.darkness, pipRadius: cfg.pipLightRadius, width: this.level.width, height: this.level.height } : null;
@@ -280,6 +297,7 @@ export class GameScene extends Phaser.Scene {
     this.elapsedMs += dt;
 
     this.updateCase();
+    this.updateTeun(dt);
     this.updateTrumpet(dt);
     this.movePlayer(dt);
     this.collectCoins();
@@ -288,7 +306,7 @@ export class GameScene extends Phaser.Scene {
     const cfg = DIFFICULTIES[this.difficulty];
     this.bystanders.update(dt, this.player.x, this.player.y, this.playing, this.hearingRadius, cfg.lingerMs);
     this.updateSpots(dt);
-    this.noir?.update(dt, this.cameras.main.worldView, this.player.x, this.player.y, this.playing, this.hearingRadius, this.rings, RING_LIFE_MS, this.officers);
+    this.noir?.update(dt, this.cameras.main.worldView, this.player.x, this.player.y, this.soundOn, this.hearingRadius, this.rings, RING_LIFE_MS, this.officers, this.soundSrc);
     this.atmosphere?.update(dt);
     this.updateDetection(dt);
 
@@ -300,8 +318,10 @@ export class GameScene extends Phaser.Scene {
 
     const atFinish = this.inRect(this.player.x, this.player.y, this.level.finish);
     const open = this.finishOpen();
-    this.closedHint.setText(atFinish && !open ? `Put up ${this.level.posters!.required} posters first` : '');
-    if (atFinish && open) this.end('complete');
+    // With Teun in the level the exit opens only when he has caught up with Pip.
+    const teunHere = !this.teun || Math.hypot(this.teun.x - this.player.x, this.teun.y - this.player.y) <= TEUN.finishRange;
+    this.closedHint.setText(atFinish && !open ? `Put up ${this.level.posters!.required} posters first` : atFinish && !teunHere ? 'Wait for Teun' : '');
+    if (atFinish && open && teunHere) this.end('complete');
   }
 
   private movePlayer(dt: number): void {
@@ -457,11 +477,18 @@ export class GameScene extends Phaser.Scene {
       this.crowds.some((c) => c.contains(x, y) && this.playerSpeed <= Math.max(c.speed * HIDE_SPEED_MARGIN, HIDE_SPEED_FLOOR)) ||
       this.bystanders.hides(x, y, this.playerSpeed);
     // Who notices Pip this frame. Searching officers only notice a hidden player (crowd, or dark at night) at close range.
-    const noticing = this.officers.filter((o) => o.notices(x, y, this.blockers, this.hidden));
+    const noticingPip = this.officers.filter((o) => o.notices(x, y, this.blockers, this.hidden));
+    // Teun is seen by the same rules (cones, night range, crowds, close range for searchers).
+    const teun = this.teun;
+    const noticingTeun = teun ? this.officers.filter((o) => o.notices(teun.x, teun.y, this.blockers, this.teunHidden)) : [];
+    const noticing = teun ? [...new Set([...noticingPip, ...noticingTeun])] : noticingPip;
     // In chase levels only officers that are not already chasing or searching fill the meter.
-    const seen = this.level.chaseMode ? noticing.some((o) => o.watching) : noticing.length > 0;
+    const pipSeen = this.level.chaseMode ? noticingPip.some((o) => o.watching) : noticingPip.length > 0;
+    const teunSeen = noticingTeun.some((o) => o.watching);
+    const seen = pipSeen || teunSeen;
+    const rate = Math.max(pipSeen ? (this.hidden ? HIDDEN_DETECTION_RATE : 1) : 0, teunSeen ? (this.teunHidden ? HIDDEN_DETECTION_RATE : 1) : 0);
     this.suspicion = seen
-      ? this.suspicion + dt * (this.hidden ? HIDDEN_DETECTION_RATE : 1)
+      ? this.suspicion + dt * rate
       : Math.max(0, this.suspicion - dt * SUSPICION_DECAY);
     const alert = Math.min(1, this.suspicion / this.catchTimeMs);
 
@@ -470,13 +497,15 @@ export class GameScene extends Phaser.Scene {
       o.drawCone(this.blockers, o.chasing ? 1 : seesPlayer ? alert : 0);
     }
 
-    if (alert > 0) this.meter.place(this.player.x - 20, this.player.y - 32 * CHARACTER_SCALE, 40, 6, 2, alert, COLORS.coneAlert);
+    // The bar sits over whoever is being watched: Pip, or Teun when only he is seen.
+    const watched = teun && teunSeen && !pipSeen ? teun.body : this.player;
+    if (alert > 0) this.meter.place(watched.x - 20, watched.y - 32 * CHARACTER_SCALE, 40, 6, 2, alert, COLORS.coneAlert);
     else this.meter.hide();
 
     this.drawStamina();
     this.hiddenIcon.setVisible(this.hidden).setPosition(x, y - 58 * CHARACTER_SCALE);
 
-    if (this.level.chaseMode) this.updateChase(dt, noticing);
+    if (this.level.chaseMode) this.updateChase(dt, noticing, noticingPip, noticingTeun);
     else if (this.suspicion >= this.catchTimeMs) this.end('caught');
   }
 
@@ -487,15 +516,20 @@ export class GameScene extends Phaser.Scene {
    * speed, to where he would be had he held his heading and speed, for chasePursuitMs; then they all search. A searching officer who notices Pip chases again.
    * Only a chasing officer touching Pip catches him.
    */
-  private updateChase(dt: number, noticing: PoliceOfficer[]): void {
+  private updateChase(dt: number, noticing: PoliceOfficer[], noticingPip: PoliceOfficer[], noticingTeun: PoliceOfficer[]): void {
     const { x, y } = this.player;
     const cfg = DIFFICULTIES[this.difficulty];
+    // Whoever an officer noticed is where he heads: Pip first, Teun when only he was seen.
+    const pip = this.subjectPip();
+    const teun = this.teun ? this.subjectTeun() : null;
+    const target = (o: PoliceOfficer) => (noticingPip.includes(o) || !teun ? pip : teun);
     if (this.suspicion >= this.catchTimeMs) {
-      for (const o of noticing) if (o.watching) o.beginChase(x, y, cfg.chaseReactMs);
-      this.markSeen();
+      const first = noticing.find((o) => o.watching);
+      for (const o of noticing) if (o.watching) o.beginChase(target(o).x, target(o).y, cfg.chaseReactMs);
+      this.markSeen(first ? target(first) : pip);
       this.suspicion = 0;
     }
-    for (const o of noticing) if (o.searching) o.beginChase(x, y, cfg.chaseReactMs);
+    for (const o of noticing) if (o.searching) o.beginChase(target(o).x, target(o).y, cfg.chaseReactMs);
 
     let chasers = this.officers.filter((o) => o.chasing);
     if (!chasers.length) return;
@@ -506,8 +540,10 @@ export class GameScene extends Phaser.Scene {
     }
     chasers = this.officers.filter((o) => o.chasing);
 
-    if (chasers.some((o) => noticing.includes(o))) {
-      this.markSeen();
+    if (chasers.some((o) => noticingPip.includes(o))) {
+      this.markSeen(pip);
+    } else if (teun && chasers.some((o) => noticingTeun.includes(o))) {
+      this.markSeen(teun);
     } else {
       this.chaseLostMs += dt;
     }
@@ -519,7 +555,9 @@ export class GameScene extends Phaser.Scene {
       this.startSearch(chasers);
       this.chaseLostMs = 0;
     }
-    if (chasers.some((o) => Math.hypot(o.x - x, o.y - y) <= PLAYER_RADIUS + OFFICER_RADIUS)) this.end('caught');
+    // An officer reaching either of them ends the run.
+    const t = this.teun;
+    if (chasers.some((o) => Math.hypot(o.x - x, o.y - y) <= PLAYER_RADIUS + OFFICER_RADIUS || (t && Math.hypot(o.x - t.x, o.y - t.y) <= TEUN.radius + OFFICER_RADIUS))) this.end('caught');
   }
 
   /** How far (up to max units, in steps of 20) the line from the last seen spot along Pip's heading stays clear of walls. */
@@ -535,14 +573,23 @@ export class GameScene extends Phaser.Scene {
     return len;
   }
 
-  /** A chaser sees Pip now: remember where, which way he was heading and how fast. */
-  private markSeen(): void {
-    this.chaseLastX = this.player.x;
-    this.chaseLastY = this.player.y;
-    this.chaseDirX = this.moveDirX;
-    this.chaseDirY = this.moveDirY;
-    this.chaseSpeed = this.playerSpeed;
+  /** A chaser sees Pip (or Teun) now: remember where, which way he was heading and how fast. */
+  private markSeen(s: { x: number; y: number; dirX: number; dirY: number; speed: number }): void {
+    this.chaseLastX = s.x;
+    this.chaseLastY = s.y;
+    this.chaseDirX = s.dirX;
+    this.chaseDirY = s.dirY;
+    this.chaseSpeed = s.speed;
     this.chaseLostMs = 0;
+  }
+
+  private subjectPip() {
+    return { x: this.player.x, y: this.player.y, dirX: this.moveDirX, dirY: this.moveDirY, speed: this.playerSpeed };
+  }
+
+  private subjectTeun() {
+    const t = this.teun!;
+    return { x: t.x, y: t.y, dirX: t.dirX, dirY: t.dirY, speed: t.speed };
   }
 
   /**
@@ -663,14 +710,21 @@ export class GameScene extends Phaser.Scene {
 
   /** Reads the trumpet input, fills or drains the noise meter, calls officers when it fills, draws the rings. */
   private updateTrumpet(dt: number): void {
-    if (!this.level.trumpet) return;
+    if (!this.level.trumpet && !this.teun) return;
     const cfg = DIFFICULTIES[this.difficulty];
-    this.playing = !this.carrying && (this.trumpetOverride || this.keys.space.isDown || this.trumpetPointer !== null);
-    this.noise = Phaser.Math.Clamp(this.noise + (dt / 1000) * (this.playing ? cfg.noiseRisePerSec : -cfg.noiseFallPerSec), 0, 1);
+    this.playing = !!this.level.trumpet && !this.carrying && (this.trumpetOverride || this.keys.space.isDown || this.trumpetPointer !== null);
+    // Teun's drum is trumpet noise from where he stands, noiseStrength times as loud.
+    const drum = this.teun !== null && this.teun.drumming;
+    const source = drum ? this.teun!.body : this.player;
+    this.soundOn = this.playing || drum;
+    this.soundSrc.x = source.x;
+    this.soundSrc.y = source.y;
+    const rise = (this.playing ? cfg.noiseRisePerSec : 0) + (drum ? cfg.noiseRisePerSec * TEUN.noiseStrength : 0);
+    this.noise = Phaser.Math.Clamp(this.noise + (dt / 1000) * (rise > 0 ? rise : -cfg.noiseFallPerSec), 0, 1);
     if (this.noise >= 1) {
-      // Too loud: officers within hearing come to look where Pip is now, walking round buildings on the navigation grid.
+      // Too loud: officers within hearing come to look where the sound is now, walking round buildings on the navigation grid.
       // One whose walk is more than NOISE_WALK_FACTOR times the hearing distance is too far round to bother.
-      const { x, y } = this.player;
+      const { x, y } = this.soundSrc;
       for (const o of this.officers) {
         if (Math.hypot(o.x - x, o.y - y) <= this.alertRadius && o.walkDistanceTo(x, y) <= this.alertRadius * NOISE_WALK_FACTOR) o.investigate(x, y);
       }
@@ -679,8 +733,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.ringClock -= dt;
-    if (this.playing && this.ringClock <= 0) {
-      this.rings.push({ x: this.player.x, y: this.player.y, age: 0 });
+    if (this.soundOn && this.ringClock <= 0) {
+      this.rings.push({ x: source.x, y: source.y, age: 0 });
       this.ringClock = RING_INTERVAL_MS;
     }
     this.rings = this.rings.filter((r) => (r.age += dt) < RING_LIFE_MS);
@@ -791,6 +845,63 @@ export class GameScene extends Phaser.Scene {
     this.trumpetButton?.setScale(1);
   }
 
+  /** Teun: keep him moving, apply the key, and decide whether the crowd rules hide him (same rule as Pip, on his own speed). */
+  private updateTeun(dt: number): void {
+    const t = this.teun;
+    if (!t) return;
+    if (Phaser.Input.Keyboard.JustDown(this.keys.t)) t.toggle();
+    // During a chase and the search that follows, Teun always follows Pip, whatever the button says.
+    t.forceFollow = this.officers.some((o) => o.chasing || o.searching);
+    t.update(dt, this.player.x, this.player.y, PoliceOfficer.nav);
+    this.teunHidden = this.crowds.some((c) => c.contains(t.x, t.y) && t.speed <= Math.max(c.speed * HIDE_SPEED_MARGIN, HIDE_SPEED_FLOOR));
+    this.drawTeunButton();
+  }
+
+  /** Round follow / wait button above the trumpet button on the right, out of the joystick's way. */
+  private buildTeunButton(): void {
+    const ring = this.add.graphics();
+    ring.fillStyle(0x1d1f2b, 0.6).fillCircle(0, 0, 48);
+    ring.lineStyle(3, 0x62c6f0, 0.95).strokeCircle(0, 0, 48);
+    // A little drum.
+    const drum = inkify(this.add.graphics(), 1.5);
+    drum.fillStyle(0xc0392b, 1).fillRoundedRect(-14, -12, 28, 17, 4);
+    drum.fillStyle(0xf4f4f4, 1).fillEllipse(0, -12, 28, 10);
+    drum.fillStyle(0xd9b36c, 1).fillRect(-14, -22, 10, 4).fillRect(4, -22, 10, 4);
+    drum.setPosition(0, -6);
+    const word = this.add.text(0, 24, 'WAIT', { fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '16px', color: '#62c6f0', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5);
+    this.teunButton = this.add.container(GAME_WIDTH - 78, GAME_HEIGHT - 222, [ring, drum, word]).setScrollFactor(0).setDepth(95);
+    this.teunButtonKey = 'follow';
+    if (!this.sys.game.device.input.touch) {
+      this.add
+        .text(GAME_WIDTH / 2, 90, 'T: Teun waits / follows', { fontFamily: 'Arial, sans-serif', fontSize: '15px', color: '#d0d2da', stroke: '#000', strokeThickness: 3 })
+        .setOrigin(0.5, 0)
+        .setScrollFactor(0)
+        .setDepth(90);
+    }
+  }
+
+  private onTeunButton(p: Phaser.Input.Pointer): boolean {
+    const b = this.teunButton;
+    if (!b || Math.hypot(p.x - b.x, p.y - b.y) > 54) return false;
+    this.teun!.toggle();
+    this.tweens.add({ targets: b, scale: 0.9, duration: 70, yoyo: true });
+    return true;
+  }
+
+  /** The button names what a press does now: WAIT while he follows, COME while he waits, CHASE (greyed) while the chase decides. */
+  private drawTeunButton(): void {
+    const b = this.teunButton;
+    const t = this.teun;
+    if (!b || !t) return;
+    const key = t.forceFollow ? 'forced' : t.mode;
+    if (key === this.teunButtonKey) return;
+    this.teunButtonKey = key;
+    const word = b.list[2] as Phaser.GameObjects.Text;
+    word.setText(key === 'forced' ? 'RUN' : key === 'follow' ? 'WAIT' : 'COME');
+    word.setColor(key === 'wait' ? '#ffd23f' : '#62c6f0');
+    b.setAlpha(key === 'forced' ? 0.5 : 1);
+  }
+
   /** Ruby's case: the image on the ground, the one Pip carries, and the hint. */
   private buildCase(): void {
     const c = this.level.instrumentCase!;
@@ -870,6 +981,8 @@ export class GameScene extends Phaser.Scene {
       chapterIndex: this.chapterIndex,
       hasNextChapter: this.chapterIndex !== undefined && isPlayable(this.chapterIndex + 1),
     };
+    // Chapter 5 placeholders: its intro (Old Jonas points Pip at Teun) and its outro (the arrest) are not written yet, so "ch5" in chapters.json has neither.
+    // The arrest scene goes here: add "outro": "ch5-outro" to the chapter and write src/story/dialogue/ch5-outro.json.
     const outro = chapter && outcome === 'complete' ? pickScene(chapter.outro) : undefined;
     if (outro) this.scene.launch('dialogue', { dialogueId: outro.id, overlay: true, then: { key: 'result', data, launch: true } });
     else this.scene.launch('result', data);

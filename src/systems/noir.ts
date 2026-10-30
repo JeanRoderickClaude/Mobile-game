@@ -154,6 +154,8 @@ export class Noir {
   update(
     deltaMs: number, view: Phaser.Geom.Rectangle, pipX: number, pipY: number, playing: boolean, hearing: number,
     rings: { x: number; y: number; age: number }[], ringLife: number, officers: PoliceOfficer[] = [],
+    /** Where the music comes from when it is not Pip (Teun's drum): the glow and the won zones follow it. */
+    sound: { x: number; y: number } = { x: pipX, y: pipY },
   ): void {
     this.aura = Phaser.Math.Clamp(this.aura + deltaMs / (playing ? NOIR_AURA_GROW_MS : -NOIR_AURA_FADE_MS), 0, 1);
     for (const z of this.zones) {
@@ -161,12 +163,12 @@ export class Noir {
         z.spread = Math.min(1, z.spread + deltaMs / NOIR_SPREAD_MS);
         continue;
       }
-      if (playing && inside(z, pipX, pipY) && (z.left -= deltaMs) <= 0) {
+      if (playing && inside(z, sound.x, sound.y) && (z.left -= deltaMs) <= 0) {
         z.colored = true;
         this.revision++;
         z.spread = 0;
-        z.spreadX = pipX;
-        z.spreadY = pipY;
+        z.spreadX = sound.x;
+        z.spreadY = sound.y;
       }
     }
     const st = this.state;
@@ -191,7 +193,7 @@ export class Noir {
     st.zoneN = n;
     // The glow around Pip and a fading disc behind every sound ring.
     const ar = this.aura > 0 ? hearing * NOIR_AURA_FACTOR * easeOut(this.aura) : 0;
-    st.aura = [pipX - view.x, pipY - view.y, ar, 1];
+    st.aura = [sound.x - view.x, sound.y - view.y, ar, 1];
     st.ringN = Math.min(rings.length, MAX_RINGS);
     for (let i = 0; i < st.ringN; i++) {
       const r = rings[i];

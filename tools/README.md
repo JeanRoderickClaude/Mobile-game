@@ -155,6 +155,20 @@ node tools/chase.mjs src/levels/dev/practice-chase.json --trace hide,5 --shots s
 
 `--trace policy,N` prints a line every 500 ms for one run (start number N): Pip, whether he is hidden, and each officer's state (`C` chasing, `S` searching, `r` walking back, `.` patrol), position and distance. With `--shots dir` it also saves screenshots of that run: the spot, the first search, every 4 s, and when the officers are back on patrol. Pass the file path as for the other tools (levels in `src/levels/dev/` work).
 
+## teun.mjs: can Pip and Teun get through chapter 5?
+
+For levels with `"teun"` (chapter 5, `src/levels/level-05.json`). Two scripted players run the level from the start at 12 officer phases (`--starts`, `--every` 2000 ms; the players wait unseen at the start first):
+
+- `lead`: Pip walks the route at crowd pace with Teun following the whole way, never parking him.
+- `park`: the same route, but at each lane gate Pip walks into a dark pocket so Teun stops inside it, switches him to wait, walks to the pocket on the other side playing the trumpet (half speed, so the meter fills as he arrives), comes back once the officers show "?", switches Teun back to follow before his drum fills, waits until the officers who came are standing at the lure looking around, and walks both through the lane.
+
+A run is `done` when Pip reaches the exit with Teun near, `caught` when an officer reaches either of them, `timeout` when a script step cannot finish (the stage is printed). `--trace` adds each officer's state and where Pip and Teun stood when the run ended. `--only lead,park` picks players, `--difficulty easy` Relaxed. The officer across the last stretch is walked blind, and the walk into the first pocket can meet the plaza officer, so `caught@final` and `caught@gate 1 park` rows are the script meeting an officer, not the gates failing. The point of the table is `lead` against `park` at the two gates.
+
+```
+node tools/teun.mjs src/levels/level-05.json
+node tools/teun.mjs src/levels/level-05.json --difficulty easy --trace
+```
+
 ## Balancing workflow
 
 Edit the level JSON, then run ride.mjs (crowds safe), blind.mjs (solo risky), stand.mjs (standing groups useful), solve.mjs (solo still possible) and coins.mjs (route coins safe, valuable coins risky). When a crowd ride fails, look at the officer with the longest sighting. Officers walking the same direction as a crowd, just behind it, are the usual cause; crosswise sweeps with narrow cones are kinder to crowds.

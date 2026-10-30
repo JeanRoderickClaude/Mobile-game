@@ -123,6 +123,27 @@ export const CASE_SPEED_FACTOR = 0.55;
 export const CASE_DRAIN_FACTOR = 2.5;
 export const CASE_REACH = 44;
 
+// Teun, the loud drummer Pip escorts in chapter 5. Everything that tunes him lives here.
+export const TEUN = {
+  /** Walking speed along the navigation grid: Pip's walking pace (crowd pace), so a sprinting Pip outpaces him. */
+  speed: PLAYER_SPEED * WALK_FACTOR,
+  /** He keeps this far from Pip while following, and starts walking again when Pip is this much further. */
+  followDist: 46,
+  followSlack: 14,
+  /** Waiting this long fills the drum icon; then he drums. Following Pip resets it. */
+  restlessSec: 8,
+  /** Relaxed lets him wait longer (its trumpet fills the noise meter more slowly, and a lure takes longer). */
+  restlessFactor: { normal: 1, easy: 1.5 } as Record<string, number>,
+  /** How long he drums, once the icon is full. */
+  drumSec: 3.5,
+  /** While he drums the noise meter rises this many times as fast as while Pip plays the trumpet. */
+  noiseStrength: 2.4,
+  /** Half-size for being caught: an officer's centre this close to him ends the run (Pip's is PLAYER_RADIUS). */
+  radius: 16,
+  /** The exit opens when Teun is this close to Pip. */
+  finishRange: 120,
+};
+
 // Trumpet and bystanders (the per-difficulty values live in DIFFICULTIES).
 export const TRUMPET_SPEED_FACTOR = 0.5; // Pip walks at this fraction of top speed while playing
 export const BYSTANDER_WANDER_SPEED = 18; // idle stroll around the home spot
