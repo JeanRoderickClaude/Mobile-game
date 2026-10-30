@@ -120,7 +120,7 @@ export const ASSIST_BREAK_STRENGTH = 0.95;
 
 // Ruby's instrument case (chapter 4): Pip's top speed while carrying it, how much faster it drains stamina, how close he must be to pick it up.
 export const CASE_SPEED_FACTOR = 0.55;
-export const CASE_DRAIN_FACTOR = 2;
+export const CASE_DRAIN_FACTOR = 2.5;
 export const CASE_REACH = 44;
 
 // Trumpet and bystanders (the per-difficulty values live in DIFFICULTIES).
