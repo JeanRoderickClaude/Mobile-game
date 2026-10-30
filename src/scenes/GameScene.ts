@@ -22,14 +22,18 @@ import { overlaps } from '../systems/geometry';
 import { Noir } from '../systems/noir';
 import { bakeAtlas, type BakeItem } from '../systems/bake';
 import { Bar } from '../ui/bar';
+import { HintCard } from '../ui/hintCard';
 import { Atmosphere } from '../systems/atmosphere';
 import { StandSpots } from '../entities/StandSpots';
 import { NavGrid } from '../systems/nav';
-import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags, getShowFps, setFlags } from '../systems/save';
+import { addCoins, completeChapter, equippedLook, getCoins, getDifficulty, getFlags, getShowFps, hasSeenHint, markHintSeen, setFlags } from '../systems/save';
 import { playCoin } from '../systems/sfx';
 import { VirtualJoystick } from '../systems/VirtualJoystick';
 import { CoinLabel } from '../ui/widgets';
 import type { ResultData } from './ResultScene';
+
+/** Id in the save's hintsSeen for the teaching moment about where officers go when they hear the trumpet. */
+const NOISE_HINT = 'noise-target';
 
 export interface GameSceneData {
   levelIndex?: number;
@@ -126,6 +130,10 @@ export class GameScene extends Phaser.Scene {
   private teunButtonKey = '';
   /** Where the sound comes from this frame (Pip's trumpet or Teun's drum), and whether there is any. */
   private soundOn = false;
+  /** One-time hints: the card on screen (the level is paused while it shows), the ring on the spot officers walk to, and a noise alert waiting to be taught. */
+  private hintCard: HintCard | null = null;
+  private hintRing: Phaser.GameObjects.Container | null = null;
+  private noiseHint: { x: number; y: number; ms: number; officers: PoliceOfficer[] } | null = null;
   private soundSrc = { x: 0, y: 0 };
 
   constructor() {
@@ -165,6 +173,9 @@ export class GameScene extends Phaser.Scene {
     this.teunButton = null;
     this.teunButtonKey = '';
     this.soundOn = false;
+    this.hintCard = null;
+    this.hintRing = null;
+    this.noiseHint = null;
     this.trumpetOverride = false;
     this.noir = null;
     this.atmosphere = null;
@@ -291,7 +302,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.finished) return;
+    // A hint card pauses everything until it is closed.
+    if (this.finished || this.hintCard) return;
     // Cap the step so a background tab or a hitch does not teleport anyone.
     const dt = Math.min(delta, 50);
     this.elapsedMs += dt;
@@ -309,6 +321,7 @@ export class GameScene extends Phaser.Scene {
     this.noir?.update(dt, this.cameras.main.worldView, this.player.x, this.player.y, this.soundOn, this.hearingRadius, this.rings, RING_LIFE_MS, this.officers, this.soundSrc);
     this.atmosphere?.update(dt);
     this.updateDetection(dt);
+    this.updateHints(dt);
 
     this.timerText.setText(formatTime(this.elapsedMs));
     if (this.fpsText && this.time.now - this.fpsAt > 400) {
@@ -725,9 +738,15 @@ export class GameScene extends Phaser.Scene {
       // Too loud: officers within hearing come to look where the sound is now, walking round buildings on the navigation grid.
       // One whose walk is more than NOISE_WALK_FACTOR times the hearing distance is too far round to bother.
       const { x, y } = this.soundSrc;
+      const called: PoliceOfficer[] = [];
       for (const o of this.officers) {
-        if (Math.hypot(o.x - x, o.y - y) <= this.alertRadius && o.walkDistanceTo(x, y) <= this.alertRadius * NOISE_WALK_FACTOR) o.investigate(x, y);
+        if (Math.hypot(o.x - x, o.y - y) <= this.alertRadius && o.walkDistanceTo(x, y) <= this.alertRadius * NOISE_WALK_FACTOR) {
+          o.investigate(x, y);
+          called.push(o);
+        }
       }
+      // The first time in a story chapter that an officer is sent to the noise, teach where he goes (see updateHints).
+      if (called.length && this.chapterIndex !== undefined && !this.noiseHint && !hasSeenHint(NOISE_HINT)) this.noiseHint = { x, y, ms: 0, officers: called };
       this.noise = 0;
       this.cameras.main.flash(180, 255, 80, 80);
     }
@@ -746,6 +765,49 @@ export class GameScene extends Phaser.Scene {
       this.ringGfx.lineStyle(3, 0xffd23f, 0.75 * (1 - t)).strokeCircle(r.x, r.y, 20 + (this.hearingRadius - 20) * t);
     }
     this.drawNoiseMeter();
+  }
+
+  /** One-time Pip thoughts: where officers go when they hear the music, and any level hint Pip has walked up to. */
+  private updateHints(dt: number): void {
+    if (this.chapterIndex === undefined) return;
+    const nh = this.noiseHint;
+    if (nh) {
+      nh.ms += dt;
+      const busy = nh.officers.filter((o) => o.investigating);
+      if (!busy.length) {
+        this.noiseHint = null; // the alert ended in a chase or was overtaken: teach it next time
+      } else if (nh.officers.some((o) => o.going) && (Math.hypot(this.player.x - nh.x, this.player.y - nh.y) > 70 || nh.ms > 2500)) {
+        this.noiseHint = null;
+        markHintSeen(NOISE_HINT);
+        this.showHint("[He's going where the music was. Not where I am.]", { x: nh.x, y: nh.y });
+        return;
+      }
+    }
+    const chasing = this.officers.some((o) => o.chasing || o.searching);
+    for (const h of this.level.hints ?? []) {
+      if (chasing || hasSeenHint(h.id) || Math.hypot(this.player.x - h.x, this.player.y - h.y) > h.radius) continue;
+      if (this.teun && Math.hypot(this.player.x - this.teun.x, this.player.y - this.teun.y) > 170) continue;
+      markHintSeen(h.id);
+      this.showHint(h.text);
+      return;
+    }
+  }
+
+  /** Pauses the level under a Pip thought; a ring pulses on the target spot (world position) until it is closed. */
+  private showHint(text: string, target?: Point): void {
+    if (target) {
+      const g = this.add.graphics();
+      g.fillStyle(0xffd23f, 0.22).fillCircle(0, 0, 34);
+      g.lineStyle(4, 0xffd23f, 1).strokeCircle(0, 0, 34);
+      const label = this.add.text(0, -58, 'HERE', { fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '20px', color: '#ffd23f', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5);
+      this.tweens.add({ targets: g, scale: 1.5, alpha: 0.35, duration: 650, yoyo: true, repeat: -1 });
+      this.hintRing = this.add.container(target.x, target.y, [g, label]).setDepth(50);
+    }
+    this.hintCard = new HintCard(this, text, () => {
+      this.hintCard = null;
+      this.hintRing?.destroy();
+      this.hintRing = null;
+    });
   }
 
   private buildNoiseMeter(): void {

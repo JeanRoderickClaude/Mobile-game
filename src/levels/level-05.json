@@ -440,5 +440,14 @@
    "height": 48,
    "color": "#9a6bff"
   }
+ ],
+ "hints": [
+  {
+   "id": "gate-park",
+   "x": 270,
+   "y": 1700,
+   "radius": 260,
+   "text": "[Teun can't sneak past that guard. Park him in the dark, then lure the guard off with the trumpet from the other side.]"
+  }
  ]
 }

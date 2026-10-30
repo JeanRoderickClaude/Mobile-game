@@ -26,13 +26,15 @@ export interface SaveData {
   flags: Flags;
   /** Show the frame rate in a corner during levels (menu toggle). */
   showFps: boolean;
+  /** Ids of one-time hints already shown (see GameScene). Saves from before hints existed have none. */
+  hintsSeen: string[];
 }
 
 /** Story flags that were renamed: old name to new name. Saves are migrated when they load. */
 const RENAMED_FLAGS: Record<string, string> = { van_tagged: 'vanTagged' };
 
 function fresh(): SaveData {
-  return { coins: 0, owned: [], equipped: { ...DEFAULT_ITEMS }, difficulty: DEFAULT_DIFFICULTY, completed: [], flags: {}, showFps: false };
+  return { coins: 0, owned: [], equipped: { ...DEFAULT_ITEMS }, difficulty: DEFAULT_DIFFICULTY, completed: [], flags: {}, showFps: false, hintsSeen: [] };
 }
 
 let state: SaveData = load();
@@ -92,6 +94,8 @@ function sanitize(input: unknown): SaveData {
     }
   }
   out.showFps = data.showFps === true;
+  // Added after the first saves: a missing or malformed list means no hint has been shown.
+  if (Array.isArray(data.hintsSeen)) out.hintsSeen = [...new Set(data.hintsSeen.filter((id) => typeof id === 'string'))];
   return out;
 }
 
@@ -155,6 +159,16 @@ export function getShowFps(): boolean {
 
 export function setShowFps(on: boolean): void {
   state.showFps = on;
+  persist();
+}
+
+export function hasSeenHint(id: string): boolean {
+  return state.hintsSeen.includes(id);
+}
+
+export function markHintSeen(id: string): void {
+  if (hasSeenHint(id)) return;
+  state.hintsSeen.push(id);
   persist();
 }
 

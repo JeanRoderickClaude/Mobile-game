@@ -86,6 +86,10 @@ function validate(level: LevelData, path: string): LevelData {
     if (!level.trumpet) fail('"instrumentCase" uses the trumpet button; set "trumpet": true');
   }
   if (level.chaseMode !== undefined && typeof level.chaseMode !== 'boolean') fail('"chaseMode" must be true or false');
+  if (level.hints !== undefined) {
+    if (!Array.isArray(level.hints)) fail('"hints" must be an array');
+    level.hints.forEach((h, i) => (!h.id || !isPoint(h) || !(h.radius > 0) || !h.text) && fail(`hint ${i} needs "id", "x", "y", a positive "radius" and "text"`));
+  }
   if (level.teun !== undefined) {
     if (!level.teun || !isPoint(level.teun)) fail('"teun" needs "x" and "y"');
     if (!level.chaseMode) fail('"teun" needs "chaseMode": true (an officer who spots him starts a chase)');

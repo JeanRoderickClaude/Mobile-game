@@ -172,6 +172,8 @@ export interface LevelData {
   parTimeSec?: number;
   /** Optional. Ruby's instrument case lies at (x, y). Pip can pick it up and drop it with the action button; finishing sets `flag` to true when he carries it, false when not. Needs `trumpet: true` (the button is the trumpet's). */
   instrumentCase?: { x: number; y: number; flag: string };
+  /** Optional. One-time Pip thoughts shown the first time Pip (and Teun, when the level has him) comes within `radius` of (x, y). Shown once per save under `id`; only in story chapters. */
+  hints?: { id: string; x: number; y: number; radius: number; text: string }[];
   /** Optional (chapter 5). Teun, the drummer Pip escorts, starts at (x, y). The exit opens only when he is with Pip. Needs `chaseMode` and `trumpet`. */
   teun?: Point;
   /** Optional. Story-flag dependent tuning, applied by resolveLevel. */

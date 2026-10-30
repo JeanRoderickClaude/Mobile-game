@@ -71,6 +71,8 @@ Staging. Put on stage only the characters who are physically present; voices fro
 
 Drone and Partners. The surface of the game stays light and comic, but the corporation is cold and unsettling. Write it as calm, reasonable and efficient: memos, metrics, polite smiles, people described as productivity. Never make it cartoonishly evil (no cackling, no twirled moustaches, no stated wish to be evil), and never joke about it in its own scenes. Other characters may still be funny around it, as Officer Mute is when he wonders who his superiors are, but scenes inside Drone's world play straight. Hints come before proof: billboards and slips of the tongue in chapters 1 to 6, documents in chapter 7.
 
+One-time hints. A mechanic the player has to work out alone can get a single paused Pip thought in the game, written in the same voice as the dialogue (bracketed, short, dry). Chapter 2 has one about where officers go when they hear the music; chapter 5 has one at the first gate. They tell the player what to try, once.
+
 Mechanics in dialogue. When a chapter teaches something, a character says it in the world's terms (stay in the crowd, stay out of their sight lines, pick up your tips), never in button names.
 
 Spelling. American English (harbor, neighbors, apologize).

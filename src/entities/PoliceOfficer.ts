@@ -111,6 +111,16 @@ export class PoliceOfficer {
     return this.state === 'chasing';
   }
 
+  /** Walking to a noise (going) or looking around there. */
+  get investigating(): boolean {
+    return this.state === 'going' || this.state === 'looking';
+  }
+
+  /** Walking to a noise, not there yet. */
+  get going(): boolean {
+    return this.state === 'going';
+  }
+
   get searching(): boolean {
     return this.state === 'searchGo' || this.state === 'searching';
   }
