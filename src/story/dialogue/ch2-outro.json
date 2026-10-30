@@ -13,7 +13,7 @@
     {"speaker": "ruby", "text": "Don't apologize down here, kid. Down here, loud is polite. I'm Ruby. Most folks call me Ma Ruby, and the rest owe me money."},
     {"speaker": "pip", "text": "I'm Pip. I play the... well. You heard."},
     {"speaker": "ruby", "text": "Half of Port Murmur heard. You walked through a square full of Quiet Squad with a crowd humming around you. That's the point."},
-    {"speaker": "pip", "text": "(I did do that. I would like to faint about it later.)"},
+    {"speaker": "pip", "text": "[I did do that. I would like to faint about it later.]"},
     {"speaker": "ruby", "text": "The Brass Cellar has been open thirty years. Since the Silence Act, nearly every musician in town has packed up or gone quiet."},
     {"speaker": "ruby", "text": "Old Jonas sold his accordion yesterday. Said the fines cost more than the music was worth."},
     {"speaker": "pip", "text": "That's... that's awful."},
@@ -21,6 +21,6 @@
     {"speaker": "ruby", "text": "First, people need to know where and when. Ever put up posters, kid? At night? With the Squad watching?"},
     {"speaker": "pip", "text": "Um. No. Is it hard?"},
     {"speaker": "ruby", "text": "Terribly. Wear dark socks, bring a pot of glue, and don't play a single note."},
-    {"speaker": "pip", "text": "(No trumpet. In the dark. With glue. Fantastic.)"}
+    {"speaker": "pip", "text": "[No trumpet. In the dark. With glue. Fantastic.]"}
   ]
 }

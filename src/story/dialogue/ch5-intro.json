@@ -19,14 +19,14 @@
  ],
  "lines": [
   {
-   "text": "Near the docks the rain has stopped, but every gutter still drips in time. On a fish crate a boy drums on a snare strapped to his belly.",
+   "text": "In a back alley behind the market the rain has stopped, but every gutter still drips in time. On an upturned crate a boy drums on a snare strapped to his belly.",
    "enter": [
     "teun"
    ]
   },
   {
    "speaker": "teun",
-   "text": "Trumpet kid! Jonas said you'd come! Ba-da-bam! Sorry. That one fell out by itself."
+   "text": "Trumpet kid! Jonas said you'd come! The Squad chased me off the docks, so I hid here. Ba-da-bam! Sorry. That one fell out by itself."
   },
   {
    "speaker": "pip",
@@ -37,7 +37,7 @@
    "text": "Loudest in Port Murmur! Seven fines this month. The Squad keeps a drawer with my name on it."
   },
   {
-   "text": "A red coat steps out from between the crates, wet and unbothered. Ma Ruby, one day after the wall.",
+   "text": "A red coat steps out from between the crates, wet and unbothered. Ma Ruby, who left the Cellar over the back wall on a fish cart.",
    "enter": [
     "ruby"
    ],
@@ -61,14 +61,14 @@
   },
   {
    "speaker": "pip",
-   "text": "(I should say something. I say nothing. I am very good at it.)",
+   "text": "[I should say something. I say nothing. I am very good at it.]",
    "if": {
     "helpedRuby": false
    }
   },
   {
    "speaker": "pip",
-   "text": "The Squad is sweeping the docks. Jonas keeps a safe place on the harbor. We cross town by Tanner's Row and stay out of sight."
+   "text": "The Squad's vans are sweeping the market. Jonas keeps a safe place on the harbor, across town. We go by Tanner's Row and stay out of sight."
   },
   {
    "speaker": "teun",
@@ -84,10 +84,10 @@
   },
   {
    "speaker": "pip",
-   "text": "(Park him somewhere dark, for a few seconds only, and never near a policeman. I never planned to think that sentence.)"
+   "text": "[Park him somewhere dark, for a few seconds only, and never near a policeman. I never planned to think that sentence.]"
   },
   {
-   "text": "Far off, a whistle. Then another. The Quiet Squad's vans are crawling along the quay road.",
+   "text": "Far off, a whistle. Then another. The Quiet Squad's vans are crawling along the market streets.",
    "tone": "gray"
   },
   {
@@ -96,7 +96,7 @@
   },
   {
    "speaker": "pip",
-   "text": "(Two bad hiders and one snare drum. Easy.)"
+   "text": "[Two bad hiders and one snare drum. Easy.]"
   }
  ]
 }

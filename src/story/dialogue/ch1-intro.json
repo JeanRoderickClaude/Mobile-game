@@ -10,10 +10,10 @@
   "lines": [
     {"text": "Port Murmur, nine in the morning. Usually the gulls, the foghorns and the fish sellers make this the loudest harbor on the coast."},
     {"text": "Not today. At midnight the Silence Act took effect, and any street sound over sixty decibels now carries a fine."},
-    {"speaker": "pip", "text": "(Okay. Nobody's here. One song before the Act notices me.)"},
+    {"speaker": "pip", "text": "[Okay. Nobody's here. One song before the Act notices me.]"},
     {"speaker": "gus", "text": "Pip, you're playing today? Quick, then, the sad one. My haddock love the sad one."},
     {"speaker": "pip", "text": "Um, hi, Gus. Just a quiet one. I put a sock in it."},
-    {"speaker": "pip", "text": "(There is no sock. There has never been a sock.)"},
+    {"speaker": "pip", "text": "[There is no sock. There has never been a sock.]"},
     {"text": "Pip plays the sad one. Three people stop, then ten, and a toddler starts dancing very badly. For a moment, it is a good morning."},
     {"text": "A white van mounts the pavement. Three officers in grey step out, decibel meters raised like holy relics.", "enter": ["hush", "mute"], "tone": "gray"},
     {"speaker": "hush", "text": "Quiet Squad! Nobody move, nobody hum. Officer Mute, a reading, please."},
@@ -23,6 +23,6 @@
     {"speaker": "pip", "text": "I, um. It's a trumpet. That's sort of its whole job."},
     {"speaker": "hush", "text": "Then its job is now illegal. Lower the instrument slowly and surrender it for decibel-safe storage."},
     {"speaker": "gus", "text": "Pip. The march is heading north up Main Street. Get in the middle, stay out of their sight lines, and pick up your tips on the way."},
-    {"speaker": "pip", "text": "(Surrender it? It was Grandad's. Okay, feet, please do something brave.)"}
+    {"speaker": "pip", "text": "[Surrender it? It was Grandad's. Okay, feet, please do something brave.]"}
   ]
 }

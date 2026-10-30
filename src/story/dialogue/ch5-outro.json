@@ -36,7 +36,7 @@
   },
   {
    "speaker": "pip",
-   "text": "(Fifty steps. I could walk fifty steps in my sleep.)"
+   "text": "[Fifty steps. I could walk fifty steps in my sleep.]"
   },
   {
    "text": "Two flashlights click on behind them. The color drains from the planks as Sergeant Hush and Officer Mute step out from behind the fish carts.",
@@ -56,7 +56,7 @@
   },
   {
    "speaker": "pip",
-   "text": "(Fifty steps, and two flashlights between us and the door. We are not going to get there together.)"
+   "text": "[Fifty steps, and two flashlights between us and the door. We are not going to get there together.]"
   },
   {
    "speaker": "teun",
@@ -94,7 +94,7 @@
   },
   {
    "speaker": "pip",
-   "text": "(He drummed so I could stay quiet. I will never be able to say that out loud.)"
+   "text": "[He drummed so I could stay quiet. I will never be able to say that out loud.]"
   }
  ]
 }

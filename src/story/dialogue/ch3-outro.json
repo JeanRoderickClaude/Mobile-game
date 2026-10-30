@@ -6,18 +6,18 @@
   ],
   "lines": [
     {"text": "The last tram of the night rattles up to the stop. Pip sits down with glue on both hands and one sleeve."},
-    {"speaker": "pip", "text": "(I put up posters. On walls. In the dark. Past the police. I am going to sleep for a week.)"},
-    {"speaker": "pip", "text": "(Ruby will be pleased. Ruby might even smile. It's hard to tell with Ruby.)"},
+    {"speaker": "pip", "text": "[I put up posters. On walls. In the dark. Past the police. I am going to sleep for a week.]"},
+    {"speaker": "pip", "text": "[Ruby will be pleased. Ruby might even smile. It's hard to tell with Ruby.]"},
     {"text": "Through the tram window, the Squad van glows under its lamp. The new paint shines like a wink.", "if": {"vanTagged": true}},
-    {"speaker": "pip", "text": "(The van's still spotless. Probably for the best. Probably.)", "if": {"vanTagged": false}},
+    {"speaker": "pip", "text": "[The van's still spotless. Probably for the best. Probably.]", "if": {"vanTagged": false}},
     {"speaker": "hush", "text": "All units. Unauthorized posters on Market Row. 'Concert, Saturday, you know where.' I do not know where."},
     {"speaker": "mute", "text": "Sergeant, the van has been decorated. It says TURN IT UP. In very large letters.", "if": {"vanTagged": true}},
     {"speaker": "mute", "text": "Sergeant, the van is fine. Someone did hum at me on the way past. I've logged it.", "if": {"vanTagged": false}},
     {"speaker": "hush", "text": "Calm, Mute. Measured. Drone and Partners want the walls clean before the offices open."},
     {"speaker": "hush", "text": "Find out who printed these. Then find out where they play."},
-    {"speaker": "pip", "text": "(Where they play. The Cellar.)"},
+    {"speaker": "pip", "text": "[Where they play. The Cellar.]"},
     {"text": "The tram pulls away. For the first time since the Silence Act, Pip is not thinking about getting caught. Pip is thinking about Ruby."},
-    {"speaker": "pip", "text": "(I have to warn her. First thing tomorrow. Unless tomorrow is already too late.)"},
+    {"speaker": "pip", "text": "[I have to warn her. First thing tomorrow. Unless tomorrow is already too late.]"},
     {"text": "Behind the tram, the posters glow on the gray walls: small squares of color in a city told to keep quiet.", "tone": "color"}
   ]
 }

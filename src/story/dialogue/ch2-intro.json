@@ -8,20 +8,20 @@
   ],
   "lines": [
     {"text": "The next evening. Fog rolls in off the harbor, and Pip walks the quay holding the trumpet case very casually, like a normal bag for normal things."},
-    {"speaker": "pip", "text": "(Old fish auction. Door with no handle. Knock twice, hum a B-flat. Unless it's a trap. Or a prank. Or just a door.)"},
+    {"speaker": "pip", "text": "[Old fish auction. Door with no handle. Knock twice, hum a B-flat. Unless it's a trap. Or a prank. Or just a door.]"},
     {"speaker": "gus", "text": "Pip! There you are. Half the harbor's been talking about your getaway.", "enter": ["gus"]},
     {"speaker": "pip", "text": "Oh. Um. Hi, Gus. Did they fine you?"},
     {"speaker": "gus", "text": "Forty coins and a leaflet about inner peace. Worth it. My haddock haven't been this happy in years."},
-    {"speaker": "pip", "text": "(Forty coins. Because of me. Very peaceful.)"},
+    {"speaker": "pip", "text": "[Forty coins. Because of me. Very peaceful.]"},
     {"speaker": "gus", "text": "Listen. The auction square is crawling with the Squad tonight. You won't walk past them on your own."},
     {"speaker": "pip", "text": "Then how do I, um..."},
     {"speaker": "gus", "text": "Same way you stopped the whole market yesterday. Play. Folk round here can't help themselves. They'll come and stand round you, thick as a sea wall."},
     {"speaker": "gus", "text": "Mind the needle, though. Every note shows up on their meters. Play too long and they'll come looking right where they heard it."},
-    {"speaker": "pip", "text": "(Play a little. Walk while they're still humming along. Stop before the meters twitch. Simple. Terrifying, but simple.)"},
+    {"speaker": "pip", "text": "[Play a little. Walk while they're still humming along. Stop before the meters twitch. Simple. Terrifying, but simple.]"},
     {"text": "Down the quay, a grey uniform turns slowly, sweeping a decibel meter through the fog like a lighthouse.", "enter": ["mute"]},
     {"speaker": "mute", "text": "Sergeant, I'm reading a faint thirty decibels near the bollards. Possibly a gull. Possibly a suspect gull."},
     {"speaker": "mute", "text": "Sorry, Sergeant. Drone and Partners called again, asking for hourly readings. I wasn't aware they were our superiors."},
     {"speaker": "gus", "text": "That's my cue to be a very boring fishmonger. Go on, Pip. Make some friends.", "exit": ["gus"]},
-    {"speaker": "pip", "text": "(Make friends. In public. With a trumpet. Okay, feet. You did it once.)"}
+    {"speaker": "pip", "text": "[Make friends. In public. With a trumpet. Okay, feet. You did it once.]"}
   ]
 }
