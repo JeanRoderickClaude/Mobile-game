@@ -73,13 +73,13 @@ export const DIFFICULTIES = {
     label: 'Relaxed', catchTimeMs: 1500, visionRangeFactor: 0.8,
     hearingRadius: 230, noiseRisePerSec: 1 / 7, noiseFallPerSec: 1 / 4, lingerMs: 5500, alertRadius: 380,
     darkRangeFactor: 0.45, darkness: 0.62, pipLightRadius: 150, nightHearingFactor: 1.3, nightAlertFactor: 1.2,
-    chaseSpeedFactor: 1.06, chaseAlertRadius: 240, chaseReactMs: 900, chaseJoinMs: 1600, chasePursuitMs: 2500, staminaDrainSec: 5, staminaRecoverSec: 8, staminaRestFactor: 2, staminaTiredFactor: 0.6, staminaResume: 0.25, searchAheadSec: 5, searchAheadMax: 800, searchSpread: 90, searchMs: 14000, searchCloseRange: 40,
+    chaseSpeedFactor: 1.06, chaseAlertRadius: 240, chaseReactMs: 900, chaseJoinMs: 1600, chasePursuitMs: 2500, staminaDrainSec: 7.5, staminaRecoverSec: 8, staminaRestFactor: 2, staminaTiredFactor: 0.6, staminaResume: 0.25, searchAheadSec: 5, searchAheadMax: 800, searchSpread: 90, searchMs: 14000, searchCloseRange: 40,
   },
   normal: {
     label: 'Normal', catchTimeMs: 500, visionRangeFactor: 1,
     hearingRadius: 190, noiseRisePerSec: 1 / 4.5, noiseFallPerSec: 1 / 7, lingerMs: 4000, alertRadius: 520,
     darkRangeFactor: 0.5, darkness: 0.78, pipLightRadius: 120, nightHearingFactor: 1.3, nightAlertFactor: 1.3,
-    chaseSpeedFactor: 1.08, chaseAlertRadius: 300, chaseReactMs: 600, chaseJoinMs: 1200, chasePursuitMs: 3000, staminaDrainSec: 4, staminaRecoverSec: 8, staminaRestFactor: 2, staminaTiredFactor: 0.6, staminaResume: 0.25, searchAheadSec: 6, searchAheadMax: 900, searchSpread: 100, searchMs: 12000, searchCloseRange: 55,
+    chaseSpeedFactor: 1.08, chaseAlertRadius: 300, chaseReactMs: 600, chaseJoinMs: 1200, chasePursuitMs: 3000, staminaDrainSec: 6, staminaRecoverSec: 8, staminaRestFactor: 2, staminaTiredFactor: 0.6, staminaResume: 0.25, searchAheadSec: 6, searchAheadMax: 900, searchSpread: 100, searchMs: 12000, searchCloseRange: 55,
   },
 } satisfies Record<string, DifficultyConfig>;
 
@@ -120,7 +120,7 @@ export const ASSIST_BREAK_STRENGTH = 0.95;
 
 // Ruby's instrument case (chapter 4): Pip's top speed while carrying it, how much faster it drains stamina, how close he must be to pick it up.
 export const CASE_SPEED_FACTOR = 0.55;
-export const CASE_DRAIN_FACTOR = 2.5;
+export const CASE_DRAIN_FACTOR = 2;
 export const CASE_REACH = 44;
 
 // Trumpet and bystanders (the per-difficulty values live in DIFFICULTIES).
