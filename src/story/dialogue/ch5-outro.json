@@ -1,0 +1,100 @@
+{
+ "stage": "harbor",
+ "tone": "color",
+ "cast": [
+  {
+   "id": "pip",
+   "x": 100
+  },
+  {
+   "id": "teun",
+   "x": 210
+  },
+  {
+   "id": "hush",
+   "x": 325,
+   "offstage": true
+  },
+  {
+   "id": "mute",
+   "x": 435,
+   "offstage": true
+  },
+  {
+   "id": "jonas",
+   "x": 325,
+   "offstage": true
+  }
+ ],
+ "lines": [
+  {
+   "text": "The harbor at last: wet planks, tarred boats, and Jonas's upturned hull fifty steps away. The smell of warm bread drifts across the quay."
+  },
+  {
+   "speaker": "teun",
+   "text": "We made it! Look, Pip, we made it, and I only drummed twice! ...Three times."
+  },
+  {
+   "speaker": "pip",
+   "text": "(Fifty steps. I could walk fifty steps in my sleep.)"
+  },
+  {
+   "text": "Two flashlights click on behind them. The color drains from the planks as Sergeant Hush and Officer Mute step out from behind the fish carts.",
+   "tone": "gray",
+   "enter": [
+    "hush",
+    "mute"
+   ]
+  },
+  {
+   "speaker": "hush",
+   "text": "Section 9, Subsection Hush. Unlicensed percussion within a hundred paces of a harbor building. Stand where you are."
+  },
+  {
+   "speaker": "mute",
+   "text": "Decibel reading, one hundred and four. Sergeant, the file said the boy was cheerful. It did not say how cheerful."
+  },
+  {
+   "speaker": "pip",
+   "text": "(Fifty steps, and two flashlights between us and the door. We are not going to get there together.)"
+  },
+  {
+   "speaker": "teun",
+   "text": "Pip. Count to ten, then go for Jonas's door. Don't look back."
+  },
+  {
+   "speaker": "pip",
+   "text": "Teun, no. They'll take you."
+  },
+  {
+   "speaker": "teun",
+   "text": "Somebody has to be loud so somebody else can be quiet. Ma Ruby taught me that."
+  },
+  {
+   "text": "Teun walks out into the light, lifts his sticks, and plays the loudest, happiest rhythm of his life."
+  },
+  {
+   "speaker": "hush",
+   "text": "Cease that. Cease. Officer Mute, the restraints."
+  },
+  {
+   "text": "The beams swing away from Pip and follow the drum. He slides along the wall and through Jonas's door. Behind him the rhythm stops in the middle of a beat.",
+   "exit": [
+    "teun",
+    "hush",
+    "mute"
+   ]
+  },
+  {
+   "speaker": "jonas",
+   "text": "Sit down, son, and keep away from the window. They will want something for that boy now. Names, most likely. Yours, mine, anyone who ever played a note.",
+   "enter": [
+    "jonas"
+   ]
+  },
+  {
+   "speaker": "pip",
+   "text": "(He drummed so I could stay quiet. I will never be able to say that out loud.)"
+  }
+ ]
+}

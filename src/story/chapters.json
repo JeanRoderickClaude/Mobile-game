@@ -3,7 +3,7 @@
   {"id": "ch2", "title": "Strike Up", "level": "level-02", "intro": "ch2-intro", "outro": "ch2-outro"},
   {"id": "ch3", "title": "Night Posters", "level": "level-03", "intro": "ch3-intro", "outro": "ch3-outro"},
   {"id": "ch4", "title": "The Raid", "level": "level-04", "intro": "ch4-intro", "outro": [{"scene": "ch4-outro-case", "if": {"helpedRuby": true}}, {"scene": "ch4-outro-nocase"}]},
-  {"id": "ch5", "title": "Drummer Boy", "level": "level-05"},
+  {"id": "ch5", "title": "Drummer Boy", "level": "level-05", "intro": "ch5-intro", "outro": "ch5-outro"},
   {"id": "ch6", "title": "Roadblocks"},
   {"id": "ch7", "title": "Velvet Heights"},
   {"id": "ch8", "title": "The Big Noise"}

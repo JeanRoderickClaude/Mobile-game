@@ -9,8 +9,8 @@ import { INK, inkify } from './ink';
 
 export type TeunMode = 'follow' | 'wait';
 
-/** Teun's own look: a navy hoodie, curly orange hair and a bucket hat, so he cannot be mistaken for a crowd member or for Pip. */
-const TEUN_LOOK: PlayerLook = { body: 'dark', outfit: 'hoodie-navy', hat: 'bucket-olive', sign: 'none', hair: 'curly', hairColor: 'orange' };
+/** Teun's own look: a navy hoodie and bare curly orange hair, so he cannot be mistaken for a crowd member or for Pip. */
+const TEUN_LOOK: PlayerLook = { body: 'medium', outfit: 'hoodie-navy', hat: 'none', sign: 'none', hair: 'curly', hairColor: 'orange' };
 
 /** One 0xcdcdcd step of night brightness, applied to colours drawn in code (images take a tint instead). */
 function dim(color: number, night: boolean): number {

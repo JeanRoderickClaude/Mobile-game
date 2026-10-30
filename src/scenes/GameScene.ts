@@ -1043,8 +1043,6 @@ export class GameScene extends Phaser.Scene {
       chapterIndex: this.chapterIndex,
       hasNextChapter: this.chapterIndex !== undefined && isPlayable(this.chapterIndex + 1),
     };
-    // Chapter 5 placeholders: its intro (Old Jonas points Pip at Teun) and its outro (the arrest) are not written yet, so "ch5" in chapters.json has neither.
-    // The arrest scene goes here: add "outro": "ch5-outro" to the chapter and write src/story/dialogue/ch5-outro.json.
     const outro = chapter && outcome === 'complete' ? pickScene(chapter.outro) : undefined;
     if (outro) this.scene.launch('dialogue', { dialogueId: outro.id, overlay: true, then: { key: 'result', data, launch: true } });
     else this.scene.launch('result', data);
