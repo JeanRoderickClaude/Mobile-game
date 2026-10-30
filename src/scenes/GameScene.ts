@@ -779,7 +779,9 @@ export class GameScene extends Phaser.Scene {
       } else if (nh.officers.some((o) => o.going) && (Math.hypot(this.player.x - nh.x, this.player.y - nh.y) > 70 || nh.ms > 2500)) {
         this.noiseHint = null;
         markHintSeen(NOISE_HINT);
-        this.showHint("[He's going where the music was. Not where I am.]", { x: nh.x, y: nh.y });
+        // Still standing on the spot: the first thought would be wrong, so Pip says the other one.
+        const onSpot = Math.hypot(this.player.x - nh.x, this.player.y - nh.y) <= 70;
+        this.showHint(onSpot ? "[They're coming to where the music is. Better not be here when they arrive.]" : "[He's going where the music was. Not where I am.]", { x: nh.x, y: nh.y });
         return;
       }
     }
