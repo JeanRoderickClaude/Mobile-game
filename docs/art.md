@@ -17,6 +17,8 @@ Coloured zones (won back):
 - Warm reflections 0xffc86a.
 - Music colours a zone from where Pip stands, outward over 1.4 s; the reflections follow once it settles.
 
+Barricade lamps (chapter 6) count as lights: green, flashing amber and red, drawn above the gray with the neon. The bars themselves are gray in a gray zone; their yellow and dark stripes show colour only in a coloured zone, and the warning flash is red and white stripes plus the lamps.
+
 Keep the two apart. Never use gray in a won zone or warm light in a controlled one, except for lit windows and neon, which are light sources.
 
 ## Outlines and shading

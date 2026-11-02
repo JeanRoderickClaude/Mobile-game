@@ -1,4 +1,5 @@
 import { checkFlagMap } from '../story/flags';
+import { BARRICADES } from '../config';
 import { MODIFIER_FACTORS, type LevelData } from './types';
 
 // Every JSON file in this folder is a level. They are played in file-name
@@ -94,6 +95,18 @@ function validate(level: LevelData, path: string): LevelData {
     if (!level.teun || !isPoint(level.teun)) fail('"teun" needs "x" and "y"');
     if (!level.chaseMode) fail('"teun" needs "chaseMode": true (an officer who spots him starts a chase)');
     if (!level.trumpet) fail('"teun" needs "trumpet": true (his drum fills the noise meter)');
+  }
+  if (level.barricades !== undefined) {
+    if (!Array.isArray(level.barricades)) fail('"barricades" must be an array');
+    level.barricades.forEach((b, i) => {
+      if (![b.x, b.y, b.width, b.height].every((v) => typeof v === 'number') || !(b.width > 0 && b.height > 0)) fail(`barricade ${i} needs "x", "y" and positive "width" and "height"`);
+      if (b.kind !== 'timed' && b.kind !== 'heavy') fail(`barricade ${i} "kind" must be "timed" or "heavy"`);
+      if (!['left', 'right', 'top', 'bottom'].includes(b.from)) fail(`barricade ${i} "from" must be "left", "right", "top" or "bottom"`);
+      if (b.rhythm !== undefined && (b.kind !== 'timed' || !(b.rhythm in BARRICADES.timed.rhythms))) fail(`barricade ${i} "rhythm" is for timed barricades and must be one of ${Object.keys(BARRICADES.timed.rhythms).join(', ')}`);
+      if (b.phaseMs !== undefined && (b.kind !== 'timed' || typeof b.phaseMs !== 'number')) fail(`barricade ${i} "phaseMs" is a number, for timed barricades`);
+      if (b.kind === 'heavy' && !level.crowds?.some((c) => c.type === 'marching')) fail(`barricade ${i} is heavy but the level has no marching crowd to push it`);
+    });
+    level.barricades.forEach((e, i) => e.if !== undefined && checkFlagMap(e.if, fail, `barricade ${i} "if"`));
   }
   if (level.neon !== undefined) {
     if (!Array.isArray(level.neon)) fail('"neon" must be an array');

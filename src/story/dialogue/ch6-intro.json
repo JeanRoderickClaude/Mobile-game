@@ -1,0 +1,9 @@
+{
+ "stage": "street",
+ "tone": "gray",
+ "cast": [{ "id": "pip", "x": 110 }],
+ "lines": [
+  { "text": "PLACEHOLDER. Chapter 6 intro to come: the mayor's aide, an offer for Teun, and the choice about the organizers' names. Overnight the Quiet Squad has put barricades across the streets." },
+  { "speaker": "pip", "text": "[Barricades that open and shut. Of course. Nothing says safety like a bar that decides when to move.]" }
+ ]
+}

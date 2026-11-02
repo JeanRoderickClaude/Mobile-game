@@ -1,0 +1,386 @@
+{
+ "id": "level-06",
+ "name": "Roadblocks",
+ "width": 540,
+ "height": 2880,
+ "start": {
+  "x": 270,
+  "y": 2810
+ },
+ "finish": {
+  "x": 0,
+  "y": 0,
+  "width": 540,
+  "height": 90
+ },
+ "finishLabel": "UPTOWN",
+ "trumpet": true,
+ "chaseMode": true,
+ "parTimeSec": 55,
+ "obstacles": [
+  {
+   "type": "building",
+   "x": 0,
+   "y": 1700,
+   "width": 190,
+   "height": 900
+  },
+  {
+   "type": "building",
+   "x": 350,
+   "y": 1700,
+   "width": 190,
+   "height": 900
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 1000,
+   "width": 190,
+   "height": 450
+  },
+  {
+   "type": "building",
+   "x": 350,
+   "y": 1000,
+   "width": 190,
+   "height": 450
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 620,
+   "width": 150,
+   "height": 60
+  },
+  {
+   "type": "building",
+   "x": 250,
+   "y": 620,
+   "width": 40,
+   "height": 60
+  },
+  {
+   "type": "building",
+   "x": 390,
+   "y": 620,
+   "width": 150,
+   "height": 60
+  },
+  {
+   "type": "building",
+   "x": 0,
+   "y": 90,
+   "width": 190,
+   "height": 230
+  },
+  {
+   "type": "building",
+   "x": 350,
+   "y": 90,
+   "width": 190,
+   "height": 230
+  },
+  {
+   "type": "car",
+   "x": 30,
+   "y": 1520,
+   "width": 60,
+   "height": 110
+  },
+  {
+   "type": "car",
+   "x": 450,
+   "y": 1600,
+   "width": 60,
+   "height": 110
+  },
+  {
+   "type": "car",
+   "x": 40,
+   "y": 780,
+   "width": 60,
+   "height": 110
+  },
+  {
+   "type": "car",
+   "x": 440,
+   "y": 760,
+   "width": 60,
+   "height": 110
+  }
+ ],
+ "officers": [
+  {
+   "patrol": [
+    {
+     "x": 140,
+     "y": 900
+    },
+    {
+     "x": 400,
+     "y": 900
+    }
+   ],
+   "mode": "pingpong",
+   "speed": 60,
+   "pauseMs": 600,
+   "visionRange": 250,
+   "visionAngle": 56
+  },
+  {
+   "patrol": [
+    {
+     "x": 130,
+     "y": 470
+    },
+    {
+     "x": 410,
+     "y": 470
+    }
+   ],
+   "mode": "pingpong",
+   "speed": 58,
+   "pauseMs": 700,
+   "visionRange": 250,
+   "visionAngle": 56
+  },
+  {
+   "patrol": [
+    {
+     "x": 70,
+     "y": 580
+    },
+    {
+     "x": 70,
+     "y": 360
+    }
+   ],
+   "mode": "pingpong",
+   "speed": 50,
+   "pauseMs": 900,
+   "visionRange": 230,
+   "visionAngle": 50
+  }
+ ],
+ "crowds": [
+  {
+   "type": "marching",
+   "size": 8,
+   "intervalMs": 4000,
+   "delayMs": 3500,
+   "path": [
+    {
+     "x": 270,
+     "y": 1580
+    },
+    {
+     "x": 270,
+     "y": 980
+    }
+   ]
+  },
+  {
+   "type": "marching",
+   "size": 8,
+   "intervalMs": 4500,
+   "path": [
+    {
+     "x": 270,
+     "y": 590
+    },
+    {
+     "x": 270,
+     "y": 70
+    }
+   ]
+  }
+ ],
+ "barricades": [
+  {
+   "kind": "timed",
+   "x": 190,
+   "y": 2418,
+   "width": 160,
+   "height": 24,
+   "from": "left",
+   "rhythm": "slow",
+   "phaseMs": 3200
+  },
+  {
+   "kind": "timed",
+   "x": 190,
+   "y": 2188,
+   "width": 160,
+   "height": 24,
+   "from": "right",
+   "rhythm": "normal",
+   "phaseMs": 1500
+  },
+  {
+   "kind": "timed",
+   "x": 190,
+   "y": 1978,
+   "width": 160,
+   "height": 24,
+   "from": "left",
+   "rhythm": "normal",
+   "phaseMs": 0
+  },
+  {
+   "kind": "timed",
+   "x": 190,
+   "y": 1848,
+   "width": 160,
+   "height": 24,
+   "from": "right",
+   "rhythm": "normal",
+   "phaseMs": 4150
+  },
+  {
+   "kind": "heavy",
+   "x": 190,
+   "y": 1238,
+   "width": 160,
+   "height": 24,
+   "from": "right"
+  },
+  {
+   "kind": "timed",
+   "x": 150,
+   "y": 638,
+   "width": 100,
+   "height": 24,
+   "from": "left",
+   "rhythm": "normal",
+   "phaseMs": 0
+  },
+  {
+   "kind": "timed",
+   "x": 290,
+   "y": 638,
+   "width": 100,
+   "height": 24,
+   "from": "right",
+   "rhythm": "normal",
+   "phaseMs": 4150
+  },
+  {
+   "kind": "heavy",
+   "x": 190,
+   "y": 198,
+   "width": 160,
+   "height": 24,
+   "from": "left"
+  }
+ ],
+ "coins": [
+  {
+   "x": 270,
+   "y": 2540
+  },
+  {
+   "x": 270,
+   "y": 2315
+  },
+  {
+   "x": 270,
+   "y": 2095
+  },
+  {
+   "x": 270,
+   "y": 1925
+  },
+  {
+   "x": 270,
+   "y": 1400
+  },
+  {
+   "x": 270,
+   "y": 450
+  },
+  {
+   "x": 270,
+   "y": 150
+  },
+  {
+   "x": 60,
+   "y": 880,
+   "value": 25
+  },
+  {
+   "x": 50,
+   "y": 420,
+   "value": 25
+  },
+  {
+   "x": 270,
+   "y": 1090
+  }
+ ],
+ "noir": {
+  "zones": [
+   {
+    "x": 0,
+    "y": 2640,
+    "width": 540,
+    "height": 240,
+    "start": "color"
+   },
+   {
+    "x": 0,
+    "y": 0,
+    "width": 540,
+    "height": 130,
+    "start": "color"
+   },
+   {
+    "x": 0,
+    "y": 1700,
+    "width": 540,
+    "height": 940,
+    "start": "gray",
+    "musicMs": 3000
+   }
+  ]
+ },
+ "neon": [
+  {
+   "x": 184,
+   "y": 2050,
+   "width": 6,
+   "height": 48,
+   "color": "#ff3fa4"
+  },
+  {
+   "x": 350,
+   "y": 1100,
+   "width": 6,
+   "height": 48,
+   "color": "#29e0ff"
+  },
+  {
+   "x": 184,
+   "y": 150,
+   "width": 6,
+   "height": 48,
+   "color": "#ffb03a"
+  }
+ ],
+ "hints": [
+  {
+   "id": "barricade-timed",
+   "x": 270,
+   "y": 2620,
+   "radius": 190,
+   "text": "[Flashing stripes: it's about to shut. Wait for the green lamps.]"
+  },
+  {
+   "id": "barricade-heavy",
+   "x": 270,
+   "y": 1450,
+   "radius": 210,
+   "text": "[Too heavy for me. A crowd could shove it open. I could walk in the middle of one.]"
+  }
+ ]
+}

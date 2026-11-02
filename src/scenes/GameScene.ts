@@ -4,6 +4,7 @@ import {
   NOISE_WALK_FACTOR, OFFICER_RADIUS, POSTER_ZONE, PLAYER_RADIUS, PLAYER_SPEED, SUSPICION_DECAY, WALK_FACTOR, RING_INTERVAL_MS, RING_LIFE_MS, TRUMPET_SPEED_FACTOR, GAME_HEIGHT,
   CASE_DRAIN_FACTOR, CASE_REACH, CASE_SPEED_FACTOR, TEUN,
 } from '../config';
+import { Barricades } from '../entities/Barricades';
 import { Bystanders } from '../entities/Bystanders';
 import { Character } from '../entities/Character';
 import { Coin } from '../entities/Coin';
@@ -56,7 +57,10 @@ export class GameScene extends Phaser.Scene {
   private runCoins = 0; // collected this run, paid out only at the finish
   private bonus = 0; // speed bonus paid at the finish
   private coinLabel!: CoinLabel;
+  /** Everything that blocks Pip and sight: the level's obstacles plus any barricade that is in the way right now. */
   private blockers: Rect[] = [];
+  /** Chapter 6's moving barricades, or null. */
+  private barricades: Barricades | null = null;
   private joystick!: VirtualJoystick;
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'shift' | 'space' | 'x' | 'e' | 't', Phaser.Input.Keyboard.Key>;
   private bystanders!: Bystanders;
@@ -158,7 +162,8 @@ export class GameScene extends Phaser.Scene {
     this.bonus = 0;
     this.playerSpeed = 0;
     this.hidden = false;
-    this.blockers = this.level.obstacles;
+    this.blockers = [...this.level.obstacles];
+    this.barricades = null;
     this.playing = false;
     this.noise = 0;
     this.ringClock = 0;
@@ -222,6 +227,7 @@ export class GameScene extends Phaser.Scene {
     this.coins = (this.level.coins ?? []).map((d) => new Coin(this, d));
 
     this.bystanders = new Bystanders(this, this.level.bystanders ?? [], this.blockers);
+    if (this.level.barricades?.length) this.barricades = new Barricades(this, this.level.barricades, this.difficulty, this.blockers);
     this.ringGfx = this.add.graphics().setDepth(6);
 
     this.player = new Character(this, this.level.start.x, this.level.start.y, equippedLook(), { marker: true, animated: true }).setDepth(30);
@@ -299,6 +305,8 @@ export class GameScene extends Phaser.Scene {
       this.noir.layer.setDepth(29);
       if (this.level.noir) this.atmosphere = new Atmosphere(this, this.level, this.noir);
     }
+    // The barricade lamps and countdown are lights: above the gray layer and the darkness.
+    this.barricades?.buildOverlay();
   }
 
   update(_time: number, delta: number): void {
@@ -308,6 +316,9 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(delta, 50);
     this.elapsedMs += dt;
 
+    // Barricades move first; one that closes on Pip shoves him out along the street before he moves.
+    this.barricades?.update(dt, this.crowds);
+    this.barricades?.shove(this.player, PLAYER_RADIUS, dt, this.level.obstacles, this.moveDirX, this.moveDirY);
     this.updateCase();
     this.updateTeun(dt);
     this.updateTrumpet(dt);
@@ -473,7 +484,7 @@ export class GameScene extends Phaser.Scene {
     for (const b of this.blockers) {
       const px = axis === 'x' ? v : x;
       const py = axis === 'y' ? v : y;
-      if (!overlaps(px, py, r, b)) continue;
+      if (this.barricades?.ghost.has(b) || !overlaps(px, py, r, b)) continue;
       const prev = axis === 'x' ? this.player.x : this.player.y;
       const lo = axis === 'x' ? b.x : b.y;
       const hi = lo + (axis === 'x' ? b.width : b.height);

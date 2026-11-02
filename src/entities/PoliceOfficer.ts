@@ -41,6 +41,9 @@ export class PoliceOfficer {
   /** Navigation grid of the level, set by GameScene. Without one, officers walk straight lines. */
   static nav: NavGrid | null = null;
 
+  /** Bumped by GameScene whenever a moving barricade changes what blocks sight (cones are redrawn). */
+  static sightVersion = 0;
+
   /** Chase and search values of the difficulty, set by GameScene. */
   static rules = { chaseSpeed: 160, searchMs: 8000, closeRange: 55, reactMs: 300, joinMs: 900 };
 
@@ -70,6 +73,7 @@ export class PoliceOfficer {
   private pathGX = NaN; // the goal the current path was planned for
   private pathGY = NaN;
   private repathLeft = 0;
+  private pathVersion = 0; // NavGrid.version the current path was planned on
   private searchLeft = 0;
   private reactLeft = 0; // startled: a chasing officer stands this long before running
   private searchPoints: Point[] = [];
@@ -370,7 +374,10 @@ export class PoliceOfficer {
     let ty = gy;
     if (nav) {
       const goalMoved = Math.hypot(gx - this.pathGX, gy - this.pathGY) > 8;
-      if (Number.isNaN(this.pathGX) || (goalMoved && this.repathLeft <= 0) || (this.path.length === 0 && distGoal >= 36)) {
+      // A barricade moved: the route may cross one that has closed (or miss one that has opened), so plan again.
+      const gridChanged = nav.version !== this.pathVersion && this.repathLeft <= 0;
+      if (Number.isNaN(this.pathGX) || gridChanged || (goalMoved && this.repathLeft <= 0) || (this.path.length === 0 && distGoal >= 36)) {
+        this.pathVersion = nav.version;
         this.path = nav.findPath(this.x, this.y, gx, gy);
         this.pathGX = gx;
         this.pathGY = gy;
@@ -412,7 +419,7 @@ export class PoliceOfficer {
 
   /** Draw the cone clipped by obstacles. alert (0..1) tints it toward red. */
   drawCone(blockers: Rect[], alert: number): void {
-    const key = `${this.x.toFixed(2)}|${this.y.toFixed(2)}|${this.facing.toFixed(4)}|${alert.toFixed(2)}|${PoliceOfficer.sight.night ? 1 : 0}`;
+    const key = `${this.x.toFixed(2)}|${this.y.toFixed(2)}|${this.facing.toFixed(4)}|${alert.toFixed(2)}|${PoliceOfficer.sight.night ? 1 : 0}|${PoliceOfficer.sightVersion}`;
     if (key === this.coneKey) return;
     this.coneKey = key;
     const g = this.cone;

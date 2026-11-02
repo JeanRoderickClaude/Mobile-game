@@ -4,7 +4,7 @@
   {"id": "ch3", "title": "Night Posters", "level": "level-03", "intro": "ch3-intro", "outro": "ch3-outro"},
   {"id": "ch4", "title": "The Raid", "level": "level-04", "intro": "ch4-intro", "outro": [{"scene": "ch4-outro-case", "if": {"helpedRuby": true}}, {"scene": "ch4-outro-nocase"}]},
   {"id": "ch5", "title": "Drummer Boy", "level": "level-05", "intro": "ch5-intro", "outro": "ch5-outro"},
-  {"id": "ch6", "title": "Roadblocks"},
+  {"id": "ch6", "title": "Roadblocks", "level": "level-06", "intro": "ch6-intro", "outro": "ch6-outro"},
   {"id": "ch7", "title": "Velvet Heights"},
   {"id": "ch8", "title": "The Big Noise"}
 ]

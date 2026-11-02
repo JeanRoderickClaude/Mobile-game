@@ -25,6 +25,7 @@ export function resolveLevel(level: LevelData, flags: Flags): ResolvedLevel {
     crowds: keep(level.crowds).map((c) => ({ ...c, size: Math.max(1, Math.round(c.size * crowdSize)) })),
     coins: keep(level.coins),
     bystanders: keep(level.bystanders),
+    barricades: keep(level.barricades),
     catchTimeFactor: catchTime,
   };
 }

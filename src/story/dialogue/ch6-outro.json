@@ -1,0 +1,9 @@
+{
+ "stage": "street",
+ "tone": "gray",
+ "cast": [{ "id": "pip", "x": 110 }],
+ "lines": [
+  { "text": "PLACEHOLDER. Chapter 6 outro to come. Behind Pip the last barricade slides shut, and above the rooftops the glass towers of Velvet Heights catch the light." },
+  { "speaker": "pip", "text": "[Uptown. Where nobody hums in the lifts. This should be fun.]" }
+ ]
+}

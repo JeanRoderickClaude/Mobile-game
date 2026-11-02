@@ -144,6 +144,44 @@ export const TEUN = {
   finishRange: 120,
 };
 
+// Moving barricades (chapter 6). Every barricade timing, warning and push value lives in this block.
+export const BARRICADES = {
+  /** Depth of a barricade bar along the street, in units. */
+  thickness: 24,
+  /** Timed barricades: the cycle is open, warning, closing, closed, opening. Warning and slide times are shared; open and closed times come from the level's rhythm. */
+  timed: {
+    /** Flashing stripes, a flashing amber lamp and a 2, 1 countdown show this long before the bar starts to close. */
+    warnMs: 1500,
+    /** Time a bar takes to slide shut, and to slide open again. */
+    slideMs: 600,
+    /** Open and closed times by rhythm name (a timed barricade in the level data picks one with "rhythm"). */
+    rhythms: {
+      slow: { openMs: 4200, closedMs: 2000 },
+      normal: { openMs: 3200, closedMs: 2400 },
+      quick: { openMs: 2400, closedMs: 2400 },
+    } as Record<string, { openMs: number; closedMs: number }>,
+  },
+  /** Relaxed lengthens every open window: the timed open time, and how long a heavy barricade stays open after its crowd. */
+  openFactor: { normal: 1, easy: 1.5 } as Record<string, number>,
+  /** Heavy barricades: closed until a marching crowd reaches them, then pushed aside by it. */
+  heavy: {
+    /** A marching crowd whose centre comes this close (heading toward it) stops and pushes. */
+    reach: 110,
+    /** Time the crowd takes to push the barricade open (the crowd stands still meanwhile), and to slide it shut again. */
+    pushMs: 1300,
+    closeMs: 900,
+    /** It stays open while a crowd's centre is within this distance, and this long after the last one leaves that distance. */
+    holdRadius: 200,
+    holdAfterMs: 1400,
+    /** Flashing warning before it closes again. */
+    warnMs: 1500,
+  },
+  /** A closing bar never crushes Pip: anyone inside it is shoved out along the street at this speed, to the side nearer his centre. */
+  pushOutSpeed: 260,
+  /** The warning flashes this many times a second. */
+  flashHz: 4,
+};
+
 // Trumpet and bystanders (the per-difficulty values live in DIFFICULTIES).
 export const TRUMPET_SPEED_FACTOR = 0.5; // Pip walks at this fraction of top speed while playing
 export const BYSTANDER_WANDER_SPEED = 18; // idle stroll around the home spot

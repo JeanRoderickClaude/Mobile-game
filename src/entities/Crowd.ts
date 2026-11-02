@@ -26,6 +26,8 @@ export class Crowd {
   y: number;
   /** False while a marching group is between runs. */
   active = true;
+  /** True while the group stands pushing a heavy barricade open (set by Barricades): it does not advance and counts as standing still. */
+  halted = false;
 
   private members: Member[] = [];
   private ground: Phaser.GameObjects.Arc;
@@ -90,7 +92,7 @@ export class Crowd {
 
   /** Current speed of the group in units per second (0 for standing or waiting groups). */
   get speed(): number {
-    return this.data.type === 'marching' && this.active ? this.pathSpeed : 0;
+    return this.data.type === 'marching' && this.active && !this.halted ? this.pathSpeed : 0;
   }
 
   /** Unit vector of the walking direction (marching groups). */
@@ -123,7 +125,7 @@ export class Crowd {
     }
     // Members chase their formation spot with a little slack, so the group
     // stretches and rounds corners instead of moving as one rigid block.
-    const maxStep = ((marching ? this.pathSpeed * 1.4 : 30) * deltaMs) / 1000;
+    const maxStep = ((marching && !this.halted ? this.pathSpeed * 1.4 : 30) * deltaMs) / 1000;
     for (const m of this.members) {
       const [tx, ty] = this.slot(m, this.time / 1000);
       const c = m.character;
@@ -161,7 +163,7 @@ export class Crowd {
       return;
     }
     const path = this.data.path;
-    let step = (this.pathSpeed * deltaMs) / 1000;
+    let step = this.halted ? 0 : (this.pathSpeed * deltaMs) / 1000;
     while (step > 0) {
       const goal = path[this.leg];
       const dx = goal.x - this.x;
@@ -203,6 +205,7 @@ export class Crowd {
     this.y = start.y;
     this.leg = 1;
     this.active = true;
+    this.halted = false;
     const first = this.data.path[1];
     const len = Math.hypot(first.x - start.x, first.y - start.y) || 1;
     this.dirX = this.formX = (first.x - start.x) / len;

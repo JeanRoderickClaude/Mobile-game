@@ -169,6 +169,15 @@ node tools/teun.mjs src/levels/level-05.json
 node tools/teun.mjs src/levels/level-05.json --difficulty easy --trace
 ```
 
+## barricades.mjs: do the moving barricades work (chapter 6)?
+
+```
+node tools/barricades.mjs src/levels/level-06.json
+node tools/barricades.mjs src/levels/level-06.json --difficulty easy --runs 24 --eager
+```
+
+Five checks in one run. Push-out: Pip stands in each timed bar as it closes and must end clear of every blocker. Teaching stretch: a careful bot waits for open bars and a reckless one walks straight at full speed, from several start phases; read the time range and the longest wait at a closed bar. Heavy bar: Pip pushes against the first heavy bar alone for 60 s (it must hold) and then rides the first marching crowd through it, several cycles (read how long the crowd stood pushing and the peak suspicion). Whole level: a bot that waits for open bars, rides both crowds and crosses the divider wall at an open gap, blind to the cones; `--eager` makes it walk straight to the nearer gap and wait in front. Routing: an officer plans a route across the divider wall at eight clock phases and no leg may cross a bar the grid counts closed. The tool is written for `level-06.json`'s layout (bar indices and y values); a new barricade level needs its numbers changed.
+
 ## Balancing workflow
 
 Edit the level JSON, then run ride.mjs (crowds safe), blind.mjs (solo risky), stand.mjs (standing groups useful), solve.mjs (solo still possible) and coins.mjs (route coins safe, valuable coins risky). When a crowd ride fails, look at the officer with the longest sighting. Officers walking the same direction as a crowd, just behind it, are the usual cause; crosswise sweeps with narrow cones are kinder to crowds.

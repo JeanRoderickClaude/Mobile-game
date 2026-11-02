@@ -18,13 +18,30 @@ export class NavGrid {
   readonly rows: number;
   private blocked: Uint8Array;
   /** Obstacles grown by the margin, for the straight-line checks. */
-  readonly grown: Rect[];
+  grown: Rect[] = [];
+  /** Bumped every time the grid is rebuilt for moving obstacles, so walkers know their route may be stale. */
+  version = 0;
 
-  constructor(readonly width: number, readonly height: number, obstacles: Rect[], readonly margin = NAV_MARGIN) {
+  constructor(readonly width: number, readonly height: number, private readonly fixed: Rect[], readonly margin = NAV_MARGIN) {
     this.cols = Math.ceil(width / NAV_CELL);
     this.rows = Math.ceil(height / NAV_CELL);
-    this.grown = obstacles.map((o) => ({ x: o.x - margin, y: o.y - margin, width: o.width + margin * 2, height: o.height + margin * 2 }));
     this.blocked = new Uint8Array(this.cols * this.rows);
+    this.build([]);
+  }
+
+  /**
+   * Rebuilds the grid from the fixed obstacles plus the moving ones that are closed right now
+   * (barricades). The grid object stays the same, so everyone holding it sees the change.
+   */
+  setMoving(moving: Rect[]): void {
+    this.build(moving);
+    this.version++;
+  }
+
+  private build(moving: Rect[]): void {
+    const margin = this.margin;
+    this.grown = [...this.fixed, ...moving].map((o) => ({ x: o.x - margin, y: o.y - margin, width: o.width + margin * 2, height: o.height + margin * 2 }));
+    this.blocked.fill(0);
     for (const r of this.grown) {
       const c0 = Math.max(0, Math.floor(r.x / NAV_CELL));
       const c1 = Math.min(this.cols - 1, Math.floor((r.x + r.width) / NAV_CELL));
@@ -32,7 +49,6 @@ export class NavGrid {
       const r1 = Math.min(this.rows - 1, Math.floor((r.y + r.height) / NAV_CELL));
       for (let j = r0; j <= r1; j++) for (let i = c0; i <= c1; i++) this.blocked[j * this.cols + i] = 1;
     }
-    // Keep the cells along the level edge free of the margin: only blocked by real obstacles.
   }
 
   private cell(x: number, y: number): number {

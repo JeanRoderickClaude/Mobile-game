@@ -25,6 +25,22 @@ export interface Obstacle extends Rect, Conditional {
   style?: 'water' | 'squad-van';
 }
 
+/**
+ * A moving barricade across a gap between walls (chapter 6). x, y, width and height are the gap's box;
+ * the bar is BARRICADES.thickness deep, centred in the box across the street, and slides in from the wall
+ * named by "from". It hides under that wall when open, so the wall must be at least as long as the gap.
+ */
+export interface BarricadeData extends Rect, Conditional {
+  /** "timed" slides open and shut on a rhythm; "heavy" stays shut until a marching crowd pushes it open. */
+  kind: 'timed' | 'heavy';
+  /** The wall the bar slides in from: left or right across a gap in a vertical street, top or bottom across a gap in a horizontal one. */
+  from: 'left' | 'right' | 'top' | 'bottom';
+  /** Timed only: a name from BARRICADES.timed.rhythms. Default "normal". */
+  rhythm?: string;
+  /** Timed only: shifts the cycle by this many ms, so neighbouring barricades are out of step. Default 0. */
+  phaseMs?: number;
+}
+
 export interface OfficerData extends Conditional {
   /** Waypoints in world units. The officer starts at the first one. */
   patrol: Point[];
@@ -176,6 +192,8 @@ export interface LevelData {
   hints?: { id: string; x: number; y: number; radius: number; text: string }[];
   /** Optional (chapter 5). Teun, the drummer Pip escorts, starts at (x, y). The exit opens only when he is with Pip. Needs `chaseMode` and `trumpet`. */
   teun?: Point;
+  /** Optional (chapter 6). Moving barricades; see BarricadeData. */
+  barricades?: BarricadeData[];
   /** Optional. Story-flag dependent tuning, applied by resolveLevel. */
   modifiers?: LevelModifier[];
 }
